@@ -299,6 +299,177 @@ def calibrate_age_bin_scale_factors(
     return scale_factors
 
 
+def phase_in_age_bin_mortality_rates(
+    mort_rates,
+    age_bins,
+    scale_factors,
+    phase_in_years,
+):
+    """
+    Build a phase-in path for age-bin-specific mortality shocks.
+
+    Args:
+        mort_rates (np.array): baseline mortality path
+        age_bins (list): age bins as ``[(start, end), ...]``
+        scale_factors (np.array): mortality scale factors by bin
+        phase_in_years (int): number of periods to phase in the shock
+
+    Returns:
+        np.array: mortality path with bin-specific shocks applied
+
+    """
+    alt_mort_rates = mort_rates.copy()
+    for i in range(phase_in_years):
+        phase_in_weight = (i + 1) / phase_in_years
+        for bin_idx, (age_start, age_end) in enumerate(age_bins):
+            alt_mort_rates[i, age_start:age_end] = np.minimum(
+                mort_rates[i, age_start:age_end]
+                * (1 + scale_factors[bin_idx] * phase_in_weight),
+                1.0,
+            )
+
+    return alt_mort_rates
+
+
+def final_year_age_bin_excess_deaths(
+    pop_dist,
+    fert_rates,
+    mort_rates,
+    infmort_rates,
+    imm_rates,
+    baseline_final_year_deaths,
+    age_bins,
+    scale_factors,
+):
+    """
+    Compute realized final phase-in year excess deaths by age bin.
+
+    Args:
+        pop_dist (np.array): initial population distribution
+        fert_rates (np.array): baseline fertility-rate path
+        mort_rates (np.array): baseline mortality-rate path
+        infmort_rates (np.array): baseline infant-mortality-rate path
+        imm_rates (np.array): baseline immigration-rate path
+        baseline_final_year_deaths (np.array): baseline final-year deaths by age
+        age_bins (list): age bins as ``[(start, end), ...]``
+        scale_factors (np.array): mortality scale factors by bin
+
+    Returns:
+        np.array: realized final-year excess deaths by bin
+
+    """
+    alt_mort_rates = phase_in_age_bin_mortality_rates(
+        mort_rates,
+        age_bins,
+        scale_factors,
+        mort_rates.shape[0],
+    )
+    alt_deaths = total_deaths(
+        pop_dist,
+        fert_rates,
+        alt_mort_rates,
+        infmort_rates,
+        imm_rates,
+        num_years=mort_rates.shape[0],
+    )
+    final_year_excess_deaths = (
+        alt_deaths[mort_rates.shape[0] - 1, :] - baseline_final_year_deaths
+    )
+
+    return np.array(
+        [
+            final_year_excess_deaths[age_start:age_end].sum()
+            for age_start, age_end in age_bins
+        ]
+    )
+
+
+def calibrate_dynamic_age_bin_scale_factors(
+    pop_dist,
+    fert_rates,
+    mort_rates,
+    infmort_rates,
+    imm_rates,
+    baseline_final_year_deaths,
+    excess_deaths,
+    age_bins,
+    age_shares,
+    tolerance=1.0,
+    max_iter=100,
+    update_weight=0.5,
+):
+    """
+    Iteratively match realized final-year excess deaths by age bin.
+
+    The static one-period calibration is used as the initial guess. The update
+    loop then rescales each bin's ``phi_b`` based on realized final-year excess
+    deaths after the full phase-in path and endogenous demographic transitions.
+
+    Args:
+        pop_dist (np.array): initial population distribution
+        fert_rates (np.array): baseline fertility-rate path
+        mort_rates (np.array): baseline mortality-rate path
+        infmort_rates (np.array): baseline infant-mortality-rate path
+        imm_rates (np.array): baseline immigration-rate path
+        baseline_final_year_deaths (np.array): baseline final-year deaths by age
+        excess_deaths (float): total target annual excess deaths
+        age_bins (list): age bins as ``[(start, end), ...]``
+        age_shares (np.array): target excess-death shares by bin
+        tolerance (float): max absolute bin gap in deaths
+        max_iter (int): maximum calibration iterations
+        update_weight (float): damping for multiplicative updates
+
+    Returns:
+        np.array: mortality scale factors by age bin
+
+    """
+    age_shares = np.asarray(age_shares)
+    validate_age_bins(age_bins, age_shares, num_ages=mort_rates.shape[1])
+
+    target_bin_excess_deaths = age_shares * excess_deaths
+    scale_factors = calibrate_age_bin_scale_factors(
+        pop_dist[0, :],
+        mort_rates[-1, :],
+        excess_deaths,
+        age_bins,
+        age_shares,
+    )
+
+    for _ in range(max_iter):
+        realized_bin_excess_deaths = final_year_age_bin_excess_deaths(
+            pop_dist,
+            fert_rates,
+            mort_rates,
+            infmort_rates,
+            imm_rates,
+            baseline_final_year_deaths,
+            age_bins,
+            scale_factors,
+        )
+        bin_gaps = (
+            realized_bin_excess_deaths - target_bin_excess_deaths
+        )
+        if np.max(np.abs(bin_gaps)) <= tolerance:
+            return scale_factors
+
+        safe_realized = np.where(
+            np.abs(realized_bin_excess_deaths) > 1e-12,
+            realized_bin_excess_deaths,
+            1e-12,
+        )
+        update_ratio = target_bin_excess_deaths / safe_realized
+        scale_factors = np.maximum(
+            scale_factors
+            * (1 + update_weight * (update_ratio - 1)),
+            0.0,
+        )
+
+    raise RuntimeError(
+        "Dynamic age-bin mortality calibration did not converge. "
+        f"Final absolute bin gaps: {np.abs(bin_gaps)}."
+    )
+
+
 def extrapolate_demographics(rates, num_years):
     """
     Extend demographic inputs by repeating the final observed row.
@@ -386,22 +557,31 @@ def disease_pop(
                 1.0,
             )
     elif age_bins is not None and age_shares is not None:
-        scale_factors = calibrate_age_bin_scale_factors(
-            pop_dist[0, :],
-            mort_rates[-1, :],
+        baseline_final_year_deaths = total_deaths(
+            pop_dist,
+            fert_rates,
+            mort_rates,
+            alt_infmort_rates,
+            imm_rates,
+            num_years=num_years,
+        )[num_years - 1, :]
+        scale_factors = calibrate_dynamic_age_bin_scale_factors(
+            pop_dist,
+            fert_rates,
+            mort_rates,
+            alt_infmort_rates,
+            imm_rates,
+            baseline_final_year_deaths,
             excess_deaths,
             age_bins,
             age_shares,
         )
-
-        for i in range(num_years):
-            phase_in_weight = (i + 1) / num_years
-            for bin_idx, (age_start, age_end) in enumerate(age_bins):
-                alt_mort_rates[i, age_start:age_end] = np.minimum(
-                    mort_rates[i, age_start:age_end]
-                    * (1 + scale_factors[bin_idx] * phase_in_weight),
-                    1.0,
-                )
+        alt_mort_rates = phase_in_age_bin_mortality_rates(
+            mort_rates,
+            age_bins,
+            scale_factors,
+            num_years,
+        )
     else:
         raise ValueError(
             "age_bins and age_shares must either both be provided or "
