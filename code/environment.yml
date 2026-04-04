@@ -3,10 +3,10 @@ channels:
 - conda-forge
 dependencies:
 - python>=3.12, <3.13
-- numpy
+- numpy<2
 - numba>=0.54
 - scipy>=1.7.1
-- pandas>=1.2.5
+- pandas>=1.2.5,<3
 - matplotlib
 - dask>=2.30.0
 - dask-core>=2.30.0
