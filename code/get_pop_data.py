@@ -160,6 +160,25 @@ def excess_death_dist(
     return dist
 
 
+def extrapolate_demographics(rates, num_years):
+    """
+    Extend demographic inputs by repeating the final observed row.
+
+    Args:
+        rates (np.array): demographic rate path with year in axis 0
+        num_years (int): number of years to return
+
+    Returns:
+        np.array: rate path with length num_years along axis 0
+
+    """
+    if rates.shape[0] >= num_years:
+        return rates[:num_years].copy()
+
+    extra_rows = np.repeat(rates[-1:], num_years - rates.shape[0], axis=0)
+    return np.concatenate((rates, extra_rows), axis=0)
+
+
 def disease_pop(
     p,
     pop_dist,
@@ -191,38 +210,37 @@ def disease_pop(
 
     """
 
-    # use the scipy minimize function to find the scale factor
-    scale_factor_guess = 0.01
-    res = minimize(
-        excess_death_dist,
-        scale_factor_guess,
-        args=(pop_dist[0, :], mort_rates[0, :], excess_deaths),
-    )
-    scale_factor = res.x[0]
+    # Preserve the baseline demographic path as 2025, 2026, 2026, ...
+    num_years = 5
+    fert_rates = extrapolate_demographics(fert_rates, num_years)
+    mort_rates = extrapolate_demographics(mort_rates, num_years)
+    imm_rates = extrapolate_demographics(imm_rates, num_years)
+    alt_infmort_rates = extrapolate_demographics(infmort_rates, num_years)
+
+    if excess_deaths == 0:
+        scale_factor = 0.0
+    else:
+        # use the scipy minimize function to find the scale factor
+        scale_factor_guess = 0.01
+        res = minimize(
+            excess_death_dist,
+            scale_factor_guess,
+            args=(pop_dist[0, :], mort_rates[-1, :], excess_deaths),
+        )
+        scale_factor = res.x[0]
 
     # phase in the change in mort rates over 5 years
-    num_years = 5
-    alt_mort_rates = np.zeros((num_years, p.S + p.E))
-    infmort_rates = np.zeros((num_years))
+    alt_mort_rates = np.zeros_like(mort_rates)
     for i in range(num_years):
         alt_mort_rates[i, :] = np.minimum(
-            mort_rates[0, :] * (1 + scale_factor * (i + 1) / num_years), 1.0
+            mort_rates[i, :] * (1 + scale_factor * (i + 1) / num_years), 1.0
         )
-        infmort_rates[i] = np.minimum(
-            infmort_rates[0] * (1 + scale_factor * (i + 1) / num_years), 1.0
-        )
-
-    # Extend fert_rates, imm_rates to be num_years long
-    fert_rates = np.tile(
-        fert_rates[0, :].reshape(1, p.S + p.E), (num_years, 1)
-    )
-    imm_rates = np.tile(imm_rates[0, :].reshape(1, p.S + p.E), (num_years, 1))
 
     deaths = total_deaths(
         pop_dist,
         fert_rates,
         alt_mort_rates,
-        infmort_rates,
+        alt_infmort_rates,
         imm_rates,
         num_years=200,
     )
@@ -236,7 +254,7 @@ def disease_pop(
         country_id=un_country_code,
         fert_rates=fert_rates,
         mort_rates=alt_mort_rates,
-        infmort_rates=infmort_rates,
+        infmort_rates=alt_infmort_rates,
         imm_rates=imm_rates,
         infer_pop=True,
         pop_dist=pop_dist[:1, :],
