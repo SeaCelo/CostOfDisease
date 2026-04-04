@@ -60,6 +60,7 @@ def main():
     ) as file:
         defaults = json.load(file)
     p.update_specifications(defaults)
+    p.initial_guess_r_SS = 0.03864
 
     # get baseline population data (rather than use what is in JSON)
     (
@@ -142,7 +143,7 @@ def main():
         infmort_rates,
         imm_rates,
         UN_COUNTRY_CODE,
-        excess_deaths=98_350,
+        excess_deaths=81_958,
     )
     p3.update_specifications(new_pop_dict)
 
