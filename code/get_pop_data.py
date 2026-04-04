@@ -1,6 +1,5 @@
-# %%
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import brentq, minimize
 from ogcore import demographics
 from ogcore.parameters import Specifications
 import os
@@ -160,6 +159,146 @@ def excess_death_dist(
     return dist
 
 
+def excess_death_gap(
+    scale_factor, pop_dist, mort_rates, excess_deaths=202_693
+):
+    """
+    Compute the signed excess-deaths gap for a mortality scale factor.
+
+    Args:
+        scale_factor (float): factor to apply to the mortality rates
+        pop_dist (np.array): population distribution in the target ages
+        mort_rates (np.array): mortality rates in the target ages
+        excess_deaths (float): target number of excess deaths
+
+    Returns:
+        float: predicted excess deaths minus target excess deaths
+
+    """
+    current_deaths = np.sum(pop_dist * mort_rates)
+    alt_mort_rates = np.minimum(mort_rates * (1 + scale_factor), 1.0)
+    new_deaths = np.sum(pop_dist * alt_mort_rates)
+    return new_deaths - current_deaths - excess_deaths
+
+
+def validate_age_bins(age_bins, age_shares, num_ages=100):
+    """
+    Validate that bins cover each age exactly once and shares sum to one.
+
+    Args:
+        age_bins (list): age bins as ``[(start, end), ...]``
+        age_shares (np.array): target excess-death shares by bin
+        num_ages (int): number of model ages covered by bins
+
+    """
+    if len(age_bins) != len(age_shares):
+        raise ValueError("age_bins and age_shares must have the same length.")
+
+    if not np.isclose(age_shares.sum(), 1.0):
+        raise ValueError(
+            "age_shares must sum to one, but sum to "
+            f"{age_shares.sum()}."
+        )
+
+    covered_ages = np.zeros(num_ages, dtype=bool)
+    for age_start, age_end in age_bins:
+        if age_start < 0 or age_end > num_ages or age_start >= age_end:
+            raise ValueError(
+                f"Invalid age bin ({age_start}, {age_end}) for "
+                f"{num_ages} ages."
+            )
+        if covered_ages[age_start:age_end].any():
+            raise ValueError(
+                f"Age bins overlap in ({age_start}, {age_end})."
+            )
+        covered_ages[age_start:age_end] = True
+
+    if not covered_ages.all():
+        missing_ages = np.where(~covered_ages)[0]
+        raise ValueError(f"Age bins do not cover ages {missing_ages}.")
+
+
+def solve_scale_factor_brentq(pop_dist, mort_rates, excess_deaths):
+    """
+    Solve for one mortality multiplier using a bracketed root finder.
+
+    Args:
+        pop_dist (np.array): population distribution in the target ages
+        mort_rates (np.array): baseline mortality rates in the target ages
+        excess_deaths (float): target excess deaths in the target ages
+
+    Returns:
+        float: multiplicative mortality increment ``phi``
+
+    """
+    if excess_deaths == 0:
+        return 0.0
+
+    max_excess_deaths = np.sum(pop_dist * (1.0 - mort_rates))
+    if excess_deaths > max_excess_deaths + 1e-8:
+        raise ValueError(
+            "Target excess deaths exceed the bin capacity under "
+            f"the mortality cap: target={excess_deaths}, "
+            f"capacity={max_excess_deaths}."
+        )
+
+    lower_bound = 0.0
+    upper_bound = 0.1
+    while (
+        excess_death_gap(
+            upper_bound, pop_dist, mort_rates, excess_deaths
+        )
+        < 0
+    ):
+        upper_bound *= 2
+        if upper_bound > 1e6:
+            raise RuntimeError(
+                "Could not bracket the mortality scale factor root."
+            )
+
+    return brentq(
+        excess_death_gap,
+        lower_bound,
+        upper_bound,
+        args=(pop_dist, mort_rates, excess_deaths),
+    )
+
+
+def calibrate_age_bin_scale_factors(
+    pop_dist,
+    mort_rates,
+    excess_deaths,
+    age_bins,
+    age_shares,
+):
+    """
+    Solve one mortality scale factor per age bin.
+
+    Args:
+        pop_dist (np.array): population distribution
+        mort_rates (np.array): full-intensity baseline mortality row
+        excess_deaths (float): total target annual excess deaths
+        age_bins (list): age bins as ``[(start, end), ...]``
+        age_shares (np.array): target shares by bin
+
+    Returns:
+        np.array: scale factors by age bin
+
+    """
+    validate_age_bins(age_bins, np.asarray(age_shares), num_ages=len(mort_rates))
+
+    scale_factors = np.zeros(len(age_bins))
+    for bin_idx, (age_start, age_end) in enumerate(age_bins):
+        target_bin_excess = age_shares[bin_idx] * excess_deaths
+        scale_factors[bin_idx] = solve_scale_factor_brentq(
+            pop_dist[age_start:age_end],
+            mort_rates[age_start:age_end],
+            target_bin_excess,
+        )
+
+    return scale_factors
+
+
 def extrapolate_demographics(rates, num_years):
     """
     Extend demographic inputs by repeating the final observed row.
@@ -189,13 +328,18 @@ def disease_pop(
     imm_rates,
     un_country_code="710",
     excess_deaths=202_693,
+    age_bins=None,
+    age_shares=None,
+    phase_in_years=5,
 ):
     """
     Modify mortality and then get new population objects
     Estimated lives saved per year in South Africa: 202,693
     Source: https://www.cgdev.org/blog/how-many-lives-does-us-foreign-aid-save
-    We don't know what ages are affected most from this, so for now just
-    assume a proportional increase in mortality rates across all ages"
+    If age bins and shares are provided, apply bin-specific mortality
+    multipliers calibrated to those shares while preserving the baseline
+    within-bin age profile. Otherwise, fall back to one proportional
+    all-age mortality multiplier.
 
     Args:
         p (Specifications): baseline parameters
@@ -204,6 +348,9 @@ def disease_pop(
         infmort_rates (np.array): infant mortality rates
         imm_rates (np.array): immigration rates
         excess_deaths (int): number of excess deaths to achieve
+        age_bins (list): optional age bins for bin-specific mortality shocks
+        age_shares (np.array): optional excess-death shares by age bin
+        phase_in_years (int): number of years to phase in mortality changes
 
     Returns:
         dict: population objects
@@ -211,29 +358,54 @@ def disease_pop(
     """
 
     # Preserve the baseline demographic path as 2025, 2026, 2026, ...
-    num_years = 5
+    num_years = phase_in_years
     fert_rates = extrapolate_demographics(fert_rates, num_years)
     mort_rates = extrapolate_demographics(mort_rates, num_years)
     imm_rates = extrapolate_demographics(imm_rates, num_years)
     alt_infmort_rates = extrapolate_demographics(infmort_rates, num_years)
 
-    if excess_deaths == 0:
-        scale_factor = 0.0
-    else:
-        # use the scipy minimize function to find the scale factor
-        scale_factor_guess = 0.01
-        res = minimize(
-            excess_death_dist,
-            scale_factor_guess,
-            args=(pop_dist[0, :], mort_rates[-1, :], excess_deaths),
-        )
-        scale_factor = res.x[0]
+    # Phase in the mortality changes over the requested number of years.
+    alt_mort_rates = mort_rates.copy()
+    if age_bins is None and age_shares is None:
+        if excess_deaths == 0:
+            scale_factor = 0.0
+        else:
+            # use the scipy minimize function to find the scale factor
+            scale_factor_guess = 0.01
+            res = minimize(
+                excess_death_dist,
+                scale_factor_guess,
+                args=(pop_dist[0, :], mort_rates[-1, :], excess_deaths),
+            )
+            scale_factor = res.x[0]
 
-    # phase in the change in mort rates over 5 years
-    alt_mort_rates = np.zeros_like(mort_rates)
-    for i in range(num_years):
-        alt_mort_rates[i, :] = np.minimum(
-            mort_rates[i, :] * (1 + scale_factor * (i + 1) / num_years), 1.0
+        for i in range(num_years):
+            alt_mort_rates[i, :] = np.minimum(
+                mort_rates[i, :]
+                * (1 + scale_factor * (i + 1) / num_years),
+                1.0,
+            )
+    elif age_bins is not None and age_shares is not None:
+        scale_factors = calibrate_age_bin_scale_factors(
+            pop_dist[0, :],
+            mort_rates[-1, :],
+            excess_deaths,
+            age_bins,
+            age_shares,
+        )
+
+        for i in range(num_years):
+            phase_in_weight = (i + 1) / num_years
+            for bin_idx, (age_start, age_end) in enumerate(age_bins):
+                alt_mort_rates[i, age_start:age_end] = np.minimum(
+                    mort_rates[i, age_start:age_end]
+                    * (1 + scale_factors[bin_idx] * phase_in_weight),
+                    1.0,
+                )
+    else:
+        raise ValueError(
+            "age_bins and age_shares must either both be provided or "
+            "both be None."
         )
 
     deaths = total_deaths(
