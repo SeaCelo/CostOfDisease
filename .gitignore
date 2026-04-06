@@ -190,3 +190,6 @@ cython_debug/
 *.m~
 *.sublime*
 .DS_Store
+
+# Local manuscript build outputs
+source/JDE/CostOfDisease_JDE*.pdf
