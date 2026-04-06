@@ -74,11 +74,10 @@ def main():
     ) = get_pop_data.baseline_pop(p)
     p.update_specifications(pop_dict)
 
-    # South Africa HIV/AIDS mortality-rate profile from the GBD Results tool.
-    # The reform scenarios use this detailed age profile as the shape of the
-    # excess-mortality shock and solve one scalar per scenario so the year-5
-    # realized excess deaths match the scenario totals.
-    hiv_rate_data_path = get_pop_data.GBD_HIV_RATE_DATA_PATH
+    # Freeze the paper's GBD-based mortality mapping as a checked-in
+    # age-specific HIV mortality profile so reruns do not rebuild it from the
+    # raw source CSV.
+    hiv_mortality_profile_path = get_pop_data.HIV_MORTALITY_PROFILE_PATH
 
     # Run model
     start_time = time.time()
@@ -108,7 +107,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=132_600,
-        hiv_rate_data_path=hiv_rate_data_path,
+        hiv_mortality_profile_path=hiv_mortality_profile_path,
     )
     p2.update_specifications(new_pop_dict)
 
@@ -150,7 +149,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=81_958,
-        hiv_rate_data_path=hiv_rate_data_path,
+        hiv_mortality_profile_path=hiv_mortality_profile_path,
     )
     p3.update_specifications(new_pop_dict)
 
@@ -187,7 +186,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=192_212,
-        hiv_rate_data_path=hiv_rate_data_path,
+        hiv_mortality_profile_path=hiv_mortality_profile_path,
     )
     p4.update_specifications(new_pop_dict)
 

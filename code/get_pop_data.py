@@ -19,6 +19,9 @@ GBD_HIV_RATE_DATA_PATH = os.path.abspath(
         "IHME-GBD_2023_DATA-ddf37f70-1.csv",
     )
 )
+HIV_MORTALITY_PROFILE_PATH = os.path.join(
+    DEMOG_PATH, "hiv_mortality_profile_gbd_sa_2023.csv"
+)
 GBD_HIV_RATE_GROUPS = [
     ("<1 year", [0], 0.0),
     ("12-23 months", [1], 1.0),
@@ -196,7 +199,7 @@ def excess_death_dist(
     return dist
 
 
-def load_gbd_hiv_rate_template(
+def build_gbd_hiv_mortality_profile(
     csv_path=GBD_HIV_RATE_DATA_PATH,
     location_name="South Africa",
     sex_name="Both",
@@ -205,11 +208,11 @@ def load_gbd_hiv_rate_template(
     min_rate=1e-12,
 ):
     """
-    Load and smooth the South Africa HIV/AIDS mortality-rate profile from GBD.
+    Build a smooth exact-age HIV/AIDS mortality profile from GBD.
 
     The GBD results CSV includes overlapping summary ages. This loader uses
     only the finest non-overlapping groups defined in ``GBD_HIV_RATE_GROUPS``
-    and returns an exact-age template aligned to the model ages.
+    and returns an exact-age mortality profile aligned to the model ages.
 
     Args:
         csv_path (str): path to the GBD results CSV
@@ -220,7 +223,7 @@ def load_gbd_hiv_rate_template(
         min_rate (float): lower bound used on the log-rate scale
 
     Returns:
-        np.array: smooth exact-age HIV rate template
+        np.array: smooth exact-age HIV mortality profile
 
     """
     covered_ages = np.zeros(num_ages, dtype=bool)
@@ -295,6 +298,37 @@ def load_gbd_hiv_rate_template(
     return np.maximum(exact_age_hiv_rates, 0.0)
 
 
+def load_hiv_mortality_profile(
+    profile_path=HIV_MORTALITY_PROFILE_PATH,
+    num_ages=100,
+):
+    """
+    Load the checked-in age-specific HIV mortality profile used in the paper.
+
+    Args:
+        profile_path (str): path to the frozen exact-age profile
+        num_ages (int): expected number of model ages
+
+    Returns:
+        np.array: age-specific HIV mortality profile
+
+    """
+    hiv_mortality_profile = np.loadtxt(profile_path, delimiter=",")
+    if hiv_mortality_profile.ndim != 1:
+        raise ValueError(
+            "The HIV mortality profile must be a one-dimensional age profile."
+        )
+    if hiv_mortality_profile.shape[0] != num_ages:
+        raise ValueError(
+            "The HIV mortality profile length does not match the model ages: "
+            f"{hiv_mortality_profile.shape[0]} vs {num_ages}."
+        )
+    if np.any(hiv_mortality_profile < 0):
+        raise ValueError("The HIV mortality profile must be nonnegative.")
+
+    return hiv_mortality_profile
+
+
 def extrapolate_demographics(rates, num_years):
     """
     Extend demographic inputs by repeating the final observed row.
@@ -324,15 +358,16 @@ def disease_pop(
     imm_rates,
     un_country_code="710",
     excess_deaths=202_693,
-    hiv_rate_data_path=None,
+    hiv_mortality_profile_path=None,
     phase_in_years=5,
 ):
     """
     Modify mortality and then get new population objects
     Estimated lives saved per year in South Africa: 202,693
     Source: https://www.cgdev.org/blog/how-many-lives-does-us-foreign-aid-save
-    If ``hiv_rate_data_path`` is provided, use the South Africa GBD HIV/AIDS
-    age-specific mortality-rate profile as the shape for an additive mortality
+    If ``hiv_mortality_profile_path`` is provided, use the checked-in
+    age-specific South Africa HIV mortality profile as the shape for an
+    additive mortality
     shock and solve for one scalar so year-5 realized excess deaths match the
     target. Otherwise, fall back to one proportional all-age mortality
     multiplier.
@@ -344,8 +379,8 @@ def disease_pop(
         infmort_rates (np.array): infant mortality rates
         imm_rates (np.array): immigration rates
         excess_deaths (int): number of excess deaths to achieve
-        hiv_rate_data_path (str): optional path to South Africa GBD HIV rate
-            data used to construct the age-specific shock template
+        hiv_mortality_profile_path (str): optional path to a checked-in
+            age-specific HIV mortality profile used to construct the shock
         phase_in_years (int): number of years to phase in mortality changes
 
     Returns:
@@ -362,7 +397,7 @@ def disease_pop(
 
     # Phase in the mortality changes over the requested number of years.
     alt_mort_rates = mort_rates.copy()
-    if hiv_rate_data_path is not None:
+    if hiv_mortality_profile_path is not None:
         baseline_final_year_total_deaths = total_deaths(
             pop_dist,
             fert_rates,
@@ -371,8 +406,8 @@ def disease_pop(
             imm_rates,
             num_years=num_years,
         )[num_years - 1, :].sum()
-        hiv_rate_template = load_gbd_hiv_rate_template(
-            hiv_rate_data_path,
+        hiv_mortality_profile = load_hiv_mortality_profile(
+            hiv_mortality_profile_path,
             num_ages=mort_rates.shape[1],
         )
 
@@ -382,7 +417,7 @@ def disease_pop(
                 phase_in_weight = (year_idx + 1) / num_years
                 shocked_mortality[year_idx, :] = np.minimum(
                     mort_rates[year_idx, :]
-                    + shock_scale * hiv_rate_template * phase_in_weight,
+                    + shock_scale * hiv_mortality_profile * phase_in_weight,
                     1.0,
                 )
 

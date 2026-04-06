@@ -285,9 +285,9 @@ Figure \ref{fig:cumDeaths} shows the cumulative excess deaths implied by these t
 
 This subsection translates scenario-level annual excess-death targets into age-specific mortality schedules used in the model's demographic inputs. Baseline mortality rates by age come from the United Nations World Population Prospects 2024 \citep{UN2024} and define the no-shock counterfactual path.
 
-In the model, excess mortality projections enter as changes in age-specific mortality rates (equivalently, survival probabilities), which determine cohort size and age structure over time. Rather than scaling mortality proportionally at all ages, the implementation uses the South Africa HIV/AIDS mortality profile from the GBD Results Tool to determine how the annual excess-death totals are distributed across ages. We use the 2023 South Africa, both-sexes, HIV/AIDS death-rate profile from the GBD data and restrict attention to the non-overlapping age groups reported in the source file. Those grouped death rates are then transformed into a smooth exact-age mortality template aligned to the model ages.
+In the model, excess mortality projections enter as changes in age-specific mortality rates (equivalently, survival probabilities), which determine cohort size and age structure over time. Rather than scaling mortality proportionally at all ages, the implementation uses the South Africa HIV/AIDS mortality profile from the GBD Results Tool to determine how the annual excess-death totals are distributed across ages. We use the 2023 South Africa, both-sexes, HIV/AIDS death-rate profile from the GBD data and restrict attention to the non-overlapping age groups reported in the source file. Those grouped death rates are then transformed into a smooth age-specific HIV mortality profile aligned to the model ages.
 
-For each mortality scenario $m$, let $h(s)$ denote this smooth HIV mortality template by age and let $E_m$ denote the annual excess-death target. Mortality then follows
+For each mortality scenario $m$, let $h(s)$ denote this smooth age-specific HIV mortality profile and let $E_m$ denote the annual excess-death target. Mortality then follows
 \begin{equation}
 \rho_{s,t}^{(m)}=
 \min\left\{\rho^{0}_{s,t}+ \kappa_m g_t h(s),1\right\},

@@ -28,6 +28,12 @@ Then run the model from the `code/` directory:
 python main.py
 ```
 
-This branch's mortality mapping uses the checked-in South Africa GBD HIV/AIDS age-profile input at `source/JDE/hiv-data/IHME-GBD_2023_DATA-ddf37f70-1/IHME-GBD_2023_DATA-ddf37f70-1.csv`.
+This branch's runtime mortality mapping uses the checked-in age-specific HIV mortality profile at `code/demographic_data/hiv_mortality_profile_gbd_sa_2023.csv`. The raw South Africa GBD HIV/AIDS input used to build that profile is also included for provenance at `source/JDE/hiv-data/IHME-GBD_2023_DATA-ddf37f70-1/IHME-GBD_2023_DATA-ddf37f70-1.csv`.
+
+If you ever need to rebuild the frozen age-specific HIV mortality profile from the raw GBD file, run:
+
+```bash
+python build_hiv_mortality_profile.py
+```
 
 If you need a fresh solve from `environment.yml`, keep `numpy<2` and `pandas<3` in the specification. The pinned `ogcore==0.14.3` version fails under NumPy 2 due scalar assignment behavior in the steady-state solver, and `ogzaf==0.0.8` is not compatible with `pandas` 3.x through the `pandas-datareader` import path.

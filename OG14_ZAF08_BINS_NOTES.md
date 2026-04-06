@@ -3,10 +3,12 @@ This branch is the `OG-Core 0.14.3 / OG-ZAF 0.0.8` version of the Cost of Diseas
 Relative to the pre-binning `OG-Core 0.14.3 / OG-ZAF 0.0.8` version, it adds:
 
 - South Africa 2023 HIV/AIDS mortality-rate data from the GBD Results Tool
-- a smooth exact-age HIV mortality template constructed from the non-overlapping GBD age groups
+- a frozen smooth age-specific HIV mortality profile constructed from the non-overlapping GBD age groups
 - one calibrated mortality-shock scalar per scenario so realized year-5 excess deaths match the scenario totals
 - the same environment pinning, low-scenario fix, reform demographic-path fix, and generated table cleanup already in the pre-binning branch
-- the exact GBD CSV used by the code is checked into `source/JDE/hiv-data/IHME-GBD_2023_DATA-ddf37f70-1/`
+- the exact GBD CSV used to build the profile is checked into `source/JDE/hiv-data/IHME-GBD_2023_DATA-ddf37f70-1/`
+- the runtime profile used by the paper run is checked into `code/demographic_data/hiv_mortality_profile_gbd_sa_2023.csv`
+- `code/build_hiv_mortality_profile.py` rebuilds the frozen profile from the raw GBD CSV if we ever need to refresh it
 
 Current manuscript/output status:
 
