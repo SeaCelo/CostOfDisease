@@ -1,4 +1,6 @@
+import csv
 import numpy as np
+from scipy.interpolate import PchipInterpolator
 from scipy.optimize import brentq, minimize
 from ogcore import demographics
 from ogcore.parameters import Specifications
@@ -6,6 +8,41 @@ import os
 
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 DEMOG_PATH = os.path.join(CUR_DIR, "demographic_data")
+GBD_HIV_RATE_DATA_PATH = os.path.abspath(
+    os.path.join(
+        CUR_DIR,
+        "..",
+        "source",
+        "JDE",
+        "hiv-data",
+        "IHME-GBD_2023_DATA-ddf37f70-1",
+        "IHME-GBD_2023_DATA-ddf37f70-1.csv",
+    )
+)
+GBD_HIV_RATE_GROUPS = [
+    ("<1 year", [0], 0.0),
+    ("12-23 months", [1], 1.0),
+    ("2-4 years", [2, 3, 4], 3.0),
+    ("5-9 years", [5, 6, 7, 8, 9], 7.0),
+    ("10-14 years", [10, 11, 12, 13, 14], 12.0),
+    ("15-19 years", [15, 16, 17, 18, 19], 17.0),
+    ("20-24 years", [20, 21, 22, 23, 24], 22.0),
+    ("25-29 years", [25, 26, 27, 28, 29], 27.0),
+    ("30-34 years", [30, 31, 32, 33, 34], 32.0),
+    ("35-39 years", [35, 36, 37, 38, 39], 37.0),
+    ("40-44 years", [40, 41, 42, 43, 44], 42.0),
+    ("45-49 years", [45, 46, 47, 48, 49], 47.0),
+    ("50-54 years", [50, 51, 52, 53, 54], 52.0),
+    ("55-59 years", [55, 56, 57, 58, 59], 57.0),
+    ("60-64 years", [60, 61, 62, 63, 64], 62.0),
+    ("65-69 years", [65, 66, 67, 68, 69], 67.0),
+    ("70-74 years", [70, 71, 72, 73, 74], 72.0),
+    ("75-79 years", [75, 76, 77, 78, 79], 77.0),
+    ("80-84 years", [80, 81, 82, 83, 84], 82.0),
+    ("85-89 years", [85, 86, 87, 88, 89], 87.0),
+    ("90-94 years", [90, 91, 92, 93, 94], 92.0),
+    ("95+ years", [95, 96, 97, 98, 99], 97.0),
+]
 
 
 def baseline_pop(p, un_country_code="710", download=False):
@@ -159,315 +196,103 @@ def excess_death_dist(
     return dist
 
 
-def excess_death_gap(
-    scale_factor, pop_dist, mort_rates, excess_deaths=202_693
+def load_gbd_hiv_rate_template(
+    csv_path=GBD_HIV_RATE_DATA_PATH,
+    location_name="South Africa",
+    sex_name="Both",
+    year=2023,
+    num_ages=100,
+    min_rate=1e-12,
 ):
     """
-    Compute the signed excess-deaths gap for a mortality scale factor.
+    Load and smooth the South Africa HIV/AIDS mortality-rate profile from GBD.
+
+    The GBD results CSV includes overlapping summary ages. This loader uses
+    only the finest non-overlapping groups defined in ``GBD_HIV_RATE_GROUPS``
+    and returns an exact-age template aligned to the model ages.
 
     Args:
-        scale_factor (float): factor to apply to the mortality rates
-        pop_dist (np.array): population distribution in the target ages
-        mort_rates (np.array): mortality rates in the target ages
-        excess_deaths (float): target number of excess deaths
+        csv_path (str): path to the GBD results CSV
+        location_name (str): location name in the CSV
+        sex_name (str): sex name in the CSV
+        year (int): year in the CSV
+        num_ages (int): number of model ages
+        min_rate (float): lower bound used on the log-rate scale
 
     Returns:
-        float: predicted excess deaths minus target excess deaths
+        np.array: smooth exact-age HIV rate template
 
     """
-    current_deaths = np.sum(pop_dist * mort_rates)
-    alt_mort_rates = np.minimum(mort_rates * (1 + scale_factor), 1.0)
-    new_deaths = np.sum(pop_dist * alt_mort_rates)
-    return new_deaths - current_deaths - excess_deaths
-
-
-def validate_age_bins(age_bins, age_shares, num_ages=100):
-    """
-    Validate that bins cover each age exactly once and shares sum to one.
-
-    Args:
-        age_bins (list): age bins as ``[(start, end), ...]``
-        age_shares (np.array): target excess-death shares by bin
-        num_ages (int): number of model ages covered by bins
-
-    """
-    if len(age_bins) != len(age_shares):
-        raise ValueError("age_bins and age_shares must have the same length.")
-
-    if not np.isclose(age_shares.sum(), 1.0):
-        raise ValueError(
-            "age_shares must sum to one, but sum to "
-            f"{age_shares.sum()}."
-        )
-
     covered_ages = np.zeros(num_ages, dtype=bool)
-    for age_start, age_end in age_bins:
-        if age_start < 0 or age_end > num_ages or age_start >= age_end:
-            raise ValueError(
-                f"Invalid age bin ({age_start}, {age_end}) for "
-                f"{num_ages} ages."
-            )
-        if covered_ages[age_start:age_end].any():
-            raise ValueError(
-                f"Age bins overlap in ({age_start}, {age_end})."
-            )
-        covered_ages[age_start:age_end] = True
+    required_age_labels = []
+    anchor_ages = []
+    for age_label, model_ages, anchor_age in GBD_HIV_RATE_GROUPS:
+        required_age_labels.append(age_label)
+        anchor_ages.append(anchor_age)
+        for age in model_ages:
+            if age < 0 or age >= num_ages:
+                raise ValueError(
+                    f"Invalid model age {age} in GBD group {age_label}."
+                )
+            if covered_ages[age]:
+                raise ValueError(
+                    f"GBD HIV age groups overlap at model age {age}."
+                )
+            covered_ages[age] = True
 
     if not covered_ages.all():
         missing_ages = np.where(~covered_ages)[0]
-        raise ValueError(f"Age bins do not cover ages {missing_ages}.")
-
-
-def solve_scale_factor_brentq(pop_dist, mort_rates, excess_deaths):
-    """
-    Solve for one mortality multiplier using a bracketed root finder.
-
-    Args:
-        pop_dist (np.array): population distribution in the target ages
-        mort_rates (np.array): baseline mortality rates in the target ages
-        excess_deaths (float): target excess deaths in the target ages
-
-    Returns:
-        float: multiplicative mortality increment ``phi``
-
-    """
-    if excess_deaths == 0:
-        return 0.0
-
-    max_excess_deaths = np.sum(pop_dist * (1.0 - mort_rates))
-    if excess_deaths > max_excess_deaths + 1e-8:
         raise ValueError(
-            "Target excess deaths exceed the bin capacity under "
-            f"the mortality cap: target={excess_deaths}, "
-            f"capacity={max_excess_deaths}."
+            "GBD HIV age groups do not cover model ages "
+            f"{missing_ages}."
         )
 
-    lower_bound = 0.0
-    upper_bound = 0.1
-    while (
-        excess_death_gap(
-            upper_bound, pop_dist, mort_rates, excess_deaths
-        )
-        < 0
-    ):
-        upper_bound *= 2
-        if upper_bound > 1e6:
-            raise RuntimeError(
-                "Could not bracket the mortality scale factor root."
-            )
+    gbd_group_rates = {}
+    with open(csv_path, newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        for row in reader:
+            if (
+                row["location_name"] == location_name
+                and row["sex_name"] == sex_name
+                and int(row["year"]) == year
+                and row["measure_name"] == "Deaths"
+                and row["cause_name"] == "HIV/AIDS"
+                and row["metric_name"] == "Rate"
+                and row["age_name"] in required_age_labels
+            ):
+                gbd_group_rates[row["age_name"]] = (
+                    float(row["val"]) / 100_000.0
+                )
 
-    return brentq(
-        excess_death_gap,
-        lower_bound,
-        upper_bound,
-        args=(pop_dist, mort_rates, excess_deaths),
-    )
-
-
-def calibrate_age_bin_scale_factors(
-    pop_dist,
-    mort_rates,
-    excess_deaths,
-    age_bins,
-    age_shares,
-):
-    """
-    Solve one mortality scale factor per age bin.
-
-    Args:
-        pop_dist (np.array): population distribution
-        mort_rates (np.array): full-intensity baseline mortality row
-        excess_deaths (float): total target annual excess deaths
-        age_bins (list): age bins as ``[(start, end), ...]``
-        age_shares (np.array): target shares by bin
-
-    Returns:
-        np.array: scale factors by age bin
-
-    """
-    validate_age_bins(age_bins, np.asarray(age_shares), num_ages=len(mort_rates))
-
-    scale_factors = np.zeros(len(age_bins))
-    for bin_idx, (age_start, age_end) in enumerate(age_bins):
-        target_bin_excess = age_shares[bin_idx] * excess_deaths
-        scale_factors[bin_idx] = solve_scale_factor_brentq(
-            pop_dist[age_start:age_end],
-            mort_rates[age_start:age_end],
-            target_bin_excess,
+    missing_labels = sorted(set(required_age_labels) - gbd_group_rates.keys())
+    if missing_labels:
+        raise ValueError(
+            "Missing GBD HIV rate rows for age groups "
+            f"{missing_labels}."
         )
 
-    return scale_factors
-
-
-def phase_in_age_bin_mortality_rates(
-    mort_rates,
-    age_bins,
-    scale_factors,
-    phase_in_years,
-):
-    """
-    Build a phase-in path for age-bin-specific mortality shocks.
-
-    Args:
-        mort_rates (np.array): baseline mortality path
-        age_bins (list): age bins as ``[(start, end), ...]``
-        scale_factors (np.array): mortality scale factors by bin
-        phase_in_years (int): number of periods to phase in the shock
-
-    Returns:
-        np.array: mortality path with bin-specific shocks applied
-
-    """
-    alt_mort_rates = mort_rates.copy()
-    for i in range(phase_in_years):
-        phase_in_weight = (i + 1) / phase_in_years
-        for bin_idx, (age_start, age_end) in enumerate(age_bins):
-            alt_mort_rates[i, age_start:age_end] = np.minimum(
-                mort_rates[i, age_start:age_end]
-                * (1 + scale_factors[bin_idx] * phase_in_weight),
-                1.0,
-            )
-
-    return alt_mort_rates
-
-
-def final_year_age_bin_excess_deaths(
-    pop_dist,
-    fert_rates,
-    mort_rates,
-    infmort_rates,
-    imm_rates,
-    baseline_final_year_deaths,
-    age_bins,
-    scale_factors,
-):
-    """
-    Compute realized final phase-in year excess deaths by age bin.
-
-    Args:
-        pop_dist (np.array): initial population distribution
-        fert_rates (np.array): baseline fertility-rate path
-        mort_rates (np.array): baseline mortality-rate path
-        infmort_rates (np.array): baseline infant-mortality-rate path
-        imm_rates (np.array): baseline immigration-rate path
-        baseline_final_year_deaths (np.array): baseline final-year deaths by age
-        age_bins (list): age bins as ``[(start, end), ...]``
-        scale_factors (np.array): mortality scale factors by bin
-
-    Returns:
-        np.array: realized final-year excess deaths by bin
-
-    """
-    alt_mort_rates = phase_in_age_bin_mortality_rates(
-        mort_rates,
-        age_bins,
-        scale_factors,
-        mort_rates.shape[0],
-    )
-    alt_deaths = total_deaths(
-        pop_dist,
-        fert_rates,
-        alt_mort_rates,
-        infmort_rates,
-        imm_rates,
-        num_years=mort_rates.shape[0],
-    )
-    final_year_excess_deaths = (
-        alt_deaths[mort_rates.shape[0] - 1, :] - baseline_final_year_deaths
-    )
-
-    return np.array(
+    anchor_rates = np.array(
         [
-            final_year_excess_deaths[age_start:age_end].sum()
-            for age_start, age_end in age_bins
-        ]
+            max(gbd_group_rates[age_label], min_rate)
+            for age_label in required_age_labels
+        ],
+        dtype=float,
+    )
+    log_rate_interpolator = PchipInterpolator(
+        np.array(anchor_ages, dtype=float),
+        np.log(anchor_rates),
+        extrapolate=False,
     )
 
-
-def calibrate_dynamic_age_bin_scale_factors(
-    pop_dist,
-    fert_rates,
-    mort_rates,
-    infmort_rates,
-    imm_rates,
-    baseline_final_year_deaths,
-    excess_deaths,
-    age_bins,
-    age_shares,
-    tolerance=1.0,
-    max_iter=100,
-    update_weight=0.5,
-):
-    """
-    Iteratively match realized final-year excess deaths by age bin.
-
-    The static one-period calibration is used as the initial guess. The update
-    loop then rescales each bin's ``phi_b`` based on realized final-year excess
-    deaths after the full phase-in path and endogenous demographic transitions.
-
-    Args:
-        pop_dist (np.array): initial population distribution
-        fert_rates (np.array): baseline fertility-rate path
-        mort_rates (np.array): baseline mortality-rate path
-        infmort_rates (np.array): baseline infant-mortality-rate path
-        imm_rates (np.array): baseline immigration-rate path
-        baseline_final_year_deaths (np.array): baseline final-year deaths by age
-        excess_deaths (float): total target annual excess deaths
-        age_bins (list): age bins as ``[(start, end), ...]``
-        age_shares (np.array): target excess-death shares by bin
-        tolerance (float): max absolute bin gap in deaths
-        max_iter (int): maximum calibration iterations
-        update_weight (float): damping for multiplicative updates
-
-    Returns:
-        np.array: mortality scale factors by age bin
-
-    """
-    age_shares = np.asarray(age_shares)
-    validate_age_bins(age_bins, age_shares, num_ages=mort_rates.shape[1])
-
-    target_bin_excess_deaths = age_shares * excess_deaths
-    scale_factors = calibrate_age_bin_scale_factors(
-        pop_dist[0, :],
-        mort_rates[-1, :],
-        excess_deaths,
-        age_bins,
-        age_shares,
+    exact_age_hiv_rates = np.zeros(num_ages)
+    max_anchor_age = int(anchor_ages[-1])
+    interior_ages = np.arange(max_anchor_age + 1, dtype=float)
+    exact_age_hiv_rates[: max_anchor_age + 1] = np.exp(
+        log_rate_interpolator(interior_ages)
     )
+    exact_age_hiv_rates[max_anchor_age + 1 :] = anchor_rates[-1]
 
-    for _ in range(max_iter):
-        realized_bin_excess_deaths = final_year_age_bin_excess_deaths(
-            pop_dist,
-            fert_rates,
-            mort_rates,
-            infmort_rates,
-            imm_rates,
-            baseline_final_year_deaths,
-            age_bins,
-            scale_factors,
-        )
-        bin_gaps = (
-            realized_bin_excess_deaths - target_bin_excess_deaths
-        )
-        if np.max(np.abs(bin_gaps)) <= tolerance:
-            return scale_factors
-
-        safe_realized = np.where(
-            np.abs(realized_bin_excess_deaths) > 1e-12,
-            realized_bin_excess_deaths,
-            1e-12,
-        )
-        update_ratio = target_bin_excess_deaths / safe_realized
-        scale_factors = np.maximum(
-            scale_factors
-            * (1 + update_weight * (update_ratio - 1)),
-            0.0,
-        )
-
-    raise RuntimeError(
-        "Dynamic age-bin mortality calibration did not converge. "
-        f"Final absolute bin gaps: {np.abs(bin_gaps)}."
-    )
+    return np.maximum(exact_age_hiv_rates, 0.0)
 
 
 def extrapolate_demographics(rates, num_years):
@@ -499,18 +324,18 @@ def disease_pop(
     imm_rates,
     un_country_code="710",
     excess_deaths=202_693,
-    age_bins=None,
-    age_shares=None,
+    hiv_rate_data_path=None,
     phase_in_years=5,
 ):
     """
     Modify mortality and then get new population objects
     Estimated lives saved per year in South Africa: 202,693
     Source: https://www.cgdev.org/blog/how-many-lives-does-us-foreign-aid-save
-    If age bins and shares are provided, apply bin-specific mortality
-    multipliers calibrated to those shares while preserving the baseline
-    within-bin age profile. Otherwise, fall back to one proportional
-    all-age mortality multiplier.
+    If ``hiv_rate_data_path`` is provided, use the South Africa GBD HIV/AIDS
+    age-specific mortality-rate profile as the shape for an additive mortality
+    shock and solve for one scalar so year-5 realized excess deaths match the
+    target. Otherwise, fall back to one proportional all-age mortality
+    multiplier.
 
     Args:
         p (Specifications): baseline parameters
@@ -519,8 +344,8 @@ def disease_pop(
         infmort_rates (np.array): infant mortality rates
         imm_rates (np.array): immigration rates
         excess_deaths (int): number of excess deaths to achieve
-        age_bins (list): optional age bins for bin-specific mortality shocks
-        age_shares (np.array): optional excess-death shares by age bin
+        hiv_rate_data_path (str): optional path to South Africa GBD HIV rate
+            data used to construct the age-specific shock template
         phase_in_years (int): number of years to phase in mortality changes
 
     Returns:
@@ -537,7 +362,66 @@ def disease_pop(
 
     # Phase in the mortality changes over the requested number of years.
     alt_mort_rates = mort_rates.copy()
-    if age_bins is None and age_shares is None:
+    if hiv_rate_data_path is not None:
+        baseline_final_year_total_deaths = total_deaths(
+            pop_dist,
+            fert_rates,
+            mort_rates,
+            alt_infmort_rates,
+            imm_rates,
+            num_years=num_years,
+        )[num_years - 1, :].sum()
+        hiv_rate_template = load_gbd_hiv_rate_template(
+            hiv_rate_data_path,
+            num_ages=mort_rates.shape[1],
+        )
+
+        def build_hiv_shock_path(shock_scale):
+            shocked_mortality = mort_rates.copy()
+            for year_idx in range(num_years):
+                phase_in_weight = (year_idx + 1) / num_years
+                shocked_mortality[year_idx, :] = np.minimum(
+                    mort_rates[year_idx, :]
+                    + shock_scale * hiv_rate_template * phase_in_weight,
+                    1.0,
+                )
+
+            return shocked_mortality
+
+        def year5_excess_gap(shock_scale):
+            shocked_deaths = total_deaths(
+                pop_dist,
+                fert_rates,
+                build_hiv_shock_path(shock_scale),
+                alt_infmort_rates,
+                imm_rates,
+                num_years=num_years,
+            )
+            return (
+                shocked_deaths[num_years - 1, :].sum()
+                - baseline_final_year_total_deaths
+                - excess_deaths
+            )
+
+        if excess_deaths == 0:
+            shock_scale = 0.0
+        else:
+            lower_bound = 0.0
+            upper_bound = 1.0
+            while year5_excess_gap(upper_bound) < 0:
+                upper_bound *= 2
+                if upper_bound > 1e6:
+                    raise RuntimeError(
+                        "Could not bracket the HIV rate shock scale root."
+                    )
+            shock_scale = brentq(
+                year5_excess_gap,
+                lower_bound,
+                upper_bound,
+            )
+
+        alt_mort_rates = build_hiv_shock_path(shock_scale)
+    else:
         if excess_deaths == 0:
             scale_factor = 0.0
         else:
@@ -556,37 +440,6 @@ def disease_pop(
                 * (1 + scale_factor * (i + 1) / num_years),
                 1.0,
             )
-    elif age_bins is not None and age_shares is not None:
-        baseline_final_year_deaths = total_deaths(
-            pop_dist,
-            fert_rates,
-            mort_rates,
-            alt_infmort_rates,
-            imm_rates,
-            num_years=num_years,
-        )[num_years - 1, :]
-        scale_factors = calibrate_dynamic_age_bin_scale_factors(
-            pop_dist,
-            fert_rates,
-            mort_rates,
-            alt_infmort_rates,
-            imm_rates,
-            baseline_final_year_deaths,
-            excess_deaths,
-            age_bins,
-            age_shares,
-        )
-        alt_mort_rates = phase_in_age_bin_mortality_rates(
-            mort_rates,
-            age_bins,
-            scale_factors,
-            num_years,
-        )
-    else:
-        raise ValueError(
-            "age_bins and age_shares must either both be provided or "
-            "both be None."
-        )
 
     deaths = total_deaths(
         pop_dist,
