@@ -2,27 +2,30 @@ name: disease-dev
 channels:
 - conda-forge
 dependencies:
-- python>=3.12, <3.13
-- numpy<2
+- python>3.11, <3.14
+- numpy
+- setuptools
+- wheel
 - numba>=0.54
 - scipy>=1.7.1
-- pandas>=1.2.5,<3
+- pandas>=1.2.5
 - matplotlib
 - dask>=2.30.0
 - dask-core>=2.30.0
 - distributed>=2.30.1
-- marshmallow<4.0.0
-- paramtools>=0.15.0
+- paramtools>=0.20.0
 - requests
 - xlwt
 - statsmodels
 - linearmodels
+- black
 - jupyter
 - ipykernel
 - ipython
 - pip
 - pip:
   - openpyxl>=3.1.2
+  - linecheck
   - pandas-datareader
-  - ogcore==0.14.3
-  - ogzaf==0.0.8
+  - ogcore @ git+https://github.com/PSLmodels/OG-Core.git@bfe4c5bef220dee8538508b5175c2759e497e903
+  - ogzaf @ git+https://github.com/EAPD-DRB/OG-ZAF.git@819fad9349d9c4643675fb0450e0cc653a7d331a

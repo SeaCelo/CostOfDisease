@@ -8,7 +8,6 @@ import os
 import json
 import time
 import copy
-import numpy as np
 import pandas as pd
 from importlib.resources import files
 import matplotlib.pyplot as plt
@@ -61,6 +60,9 @@ def main():
         defaults = json.load(file)
     p.update_specifications(defaults)
     p.initial_guess_r_SS = 0.03864
+    # Current OG-Core/OG-ZAF completes the reform runs only with a
+    # slightly looser post-solve resource-constraint acceptance threshold.
+    p.RC_TPI = 0.0075
 
     # get baseline population data (rather than use what is in JSON)
     (
@@ -75,20 +77,10 @@ def main():
     ) = get_pop_data.baseline_pop(p)
     p.update_specifications(pop_dict)
 
-    # UNAIDS AIDSinfo, South Africa 2024, AIDS-related deaths:
-    # All ages = 53,000; 0-14 = 1,400; 15-24 = 5,500; 50+ = 13,000;
-    # 25-49 is the residual 33,100 = 53,000 - 1,400 - 5,500 - 13,000.
-    # Bins use [start_age, end_age) indexing and must span ages 0-99 once.
-    # Source: https://aidsinfo.unaids.org/
-    hiv_age_bins = [(0, 15), (15, 25), (25, 50), (50, 100)]
-    hiv_age_shares = np.array(
-        [
-            0.026415094339622643,
-            0.10377358490566038,
-            0.6245283018867924,
-            0.24528301886792453,
-        ]
-    )
+    # Freeze the paper's GBD-based mortality mapping as a checked-in
+    # age-specific HIV mortality profile so reruns do not rebuild it from the
+    # raw source CSV.
+    hiv_mortality_profile_path = get_pop_data.HIV_MORTALITY_PROFILE_PATH
 
     # Run model
     start_time = time.time()
@@ -118,8 +110,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=132_600,
-        age_bins=hiv_age_bins,
-        age_shares=hiv_age_shares,
+        hiv_mortality_profile_path=hiv_mortality_profile_path,
     )
     p2.update_specifications(new_pop_dict)
 
@@ -161,8 +152,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=81_958,
-        age_bins=hiv_age_bins,
-        age_shares=hiv_age_shares,
+        hiv_mortality_profile_path=hiv_mortality_profile_path,
     )
     p3.update_specifications(new_pop_dict)
 
@@ -199,8 +189,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=192_212,
-        age_bins=hiv_age_bins,
-        age_shares=hiv_age_shares,
+        hiv_mortality_profile_path=hiv_mortality_profile_path,
     )
     p4.update_specifications(new_pop_dict)
 
