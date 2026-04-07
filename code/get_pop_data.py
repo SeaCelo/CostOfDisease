@@ -1,6 +1,4 @@
-import csv
 import numpy as np
-from scipy.interpolate import PchipInterpolator
 from scipy.optimize import brentq, minimize
 from ogcore import demographics
 from ogcore.parameters import Specifications
@@ -8,44 +6,9 @@ import os
 
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 DEMOG_PATH = os.path.join(CUR_DIR, "demographic_data")
-GBD_HIV_RATE_DATA_PATH = os.path.abspath(
-    os.path.join(
-        CUR_DIR,
-        "..",
-        "source",
-        "JDE",
-        "hiv-data",
-        "IHME-GBD_2023_DATA-ddf37f70-1",
-        "IHME-GBD_2023_DATA-ddf37f70-1.csv",
-    )
-)
 HIV_MORTALITY_PROFILE_PATH = os.path.join(
     DEMOG_PATH, "hiv_mortality_profile_gbd_sa_2023.csv"
 )
-GBD_HIV_RATE_GROUPS = [
-    ("<1 year", [0], 0.0),
-    ("12-23 months", [1], 1.0),
-    ("2-4 years", [2, 3, 4], 3.0),
-    ("5-9 years", [5, 6, 7, 8, 9], 7.0),
-    ("10-14 years", [10, 11, 12, 13, 14], 12.0),
-    ("15-19 years", [15, 16, 17, 18, 19], 17.0),
-    ("20-24 years", [20, 21, 22, 23, 24], 22.0),
-    ("25-29 years", [25, 26, 27, 28, 29], 27.0),
-    ("30-34 years", [30, 31, 32, 33, 34], 32.0),
-    ("35-39 years", [35, 36, 37, 38, 39], 37.0),
-    ("40-44 years", [40, 41, 42, 43, 44], 42.0),
-    ("45-49 years", [45, 46, 47, 48, 49], 47.0),
-    ("50-54 years", [50, 51, 52, 53, 54], 52.0),
-    ("55-59 years", [55, 56, 57, 58, 59], 57.0),
-    ("60-64 years", [60, 61, 62, 63, 64], 62.0),
-    ("65-69 years", [65, 66, 67, 68, 69], 67.0),
-    ("70-74 years", [70, 71, 72, 73, 74], 72.0),
-    ("75-79 years", [75, 76, 77, 78, 79], 77.0),
-    ("80-84 years", [80, 81, 82, 83, 84], 82.0),
-    ("85-89 years", [85, 86, 87, 88, 89], 87.0),
-    ("90-94 years", [90, 91, 92, 93, 94], 92.0),
-    ("95+ years", [95, 96, 97, 98, 99], 97.0),
-]
 
 
 def baseline_pop(p, un_country_code="710", download=False):
@@ -199,105 +162,6 @@ def excess_death_dist(
     return dist
 
 
-def build_gbd_hiv_mortality_profile(
-    csv_path=GBD_HIV_RATE_DATA_PATH,
-    location_name="South Africa",
-    sex_name="Both",
-    year=2023,
-    num_ages=100,
-    min_rate=1e-12,
-):
-    """
-    Build a smooth exact-age HIV/AIDS mortality profile from GBD.
-
-    The GBD results CSV includes overlapping summary ages. This loader uses
-    only the finest non-overlapping groups defined in ``GBD_HIV_RATE_GROUPS``
-    and returns an exact-age mortality profile aligned to the model ages.
-
-    Args:
-        csv_path (str): path to the GBD results CSV
-        location_name (str): location name in the CSV
-        sex_name (str): sex name in the CSV
-        year (int): year in the CSV
-        num_ages (int): number of model ages
-        min_rate (float): lower bound used on the log-rate scale
-
-    Returns:
-        np.array: smooth exact-age HIV mortality profile
-
-    """
-    covered_ages = np.zeros(num_ages, dtype=bool)
-    required_age_labels = []
-    anchor_ages = []
-    for age_label, model_ages, anchor_age in GBD_HIV_RATE_GROUPS:
-        required_age_labels.append(age_label)
-        anchor_ages.append(anchor_age)
-        for age in model_ages:
-            if age < 0 or age >= num_ages:
-                raise ValueError(
-                    f"Invalid model age {age} in GBD group {age_label}."
-                )
-            if covered_ages[age]:
-                raise ValueError(
-                    f"GBD HIV age groups overlap at model age {age}."
-                )
-            covered_ages[age] = True
-
-    if not covered_ages.all():
-        missing_ages = np.where(~covered_ages)[0]
-        raise ValueError(
-            "GBD HIV age groups do not cover model ages "
-            f"{missing_ages}."
-        )
-
-    gbd_group_rates = {}
-    with open(csv_path, newline="") as csv_file:
-        reader = csv.DictReader(csv_file)
-        for row in reader:
-            if (
-                row["location_name"] == location_name
-                and row["sex_name"] == sex_name
-                and int(row["year"]) == year
-                and row["measure_name"] == "Deaths"
-                and row["cause_name"] == "HIV/AIDS"
-                and row["metric_name"] == "Rate"
-                and row["age_name"] in required_age_labels
-            ):
-                gbd_group_rates[row["age_name"]] = (
-                    float(row["val"]) / 100_000.0
-                )
-
-    missing_labels = sorted(set(required_age_labels) - gbd_group_rates.keys())
-    if missing_labels:
-        raise ValueError(
-            "Missing GBD HIV rate rows for age groups "
-            f"{missing_labels}."
-        )
-
-    anchor_rates = np.array(
-        [
-            max(gbd_group_rates[age_label], min_rate)
-            for age_label in required_age_labels
-        ],
-        dtype=float,
-    )
-    log_rate_interpolator = PchipInterpolator(
-        np.array(anchor_ages, dtype=float),
-        np.log(anchor_rates),
-        extrapolate=False,
-    )
-
-    exact_age_hiv_rates = np.zeros(num_ages)
-    max_anchor_age = int(anchor_ages[-1])
-    interior_ages = np.arange(max_anchor_age + 1, dtype=float)
-    exact_age_hiv_rates[: max_anchor_age + 1] = np.exp(
-        log_rate_interpolator(interior_ages)
-    )
-    exact_age_hiv_rates[max_anchor_age + 1 :] = anchor_rates[-1]
-
-    return np.maximum(exact_age_hiv_rates, 0.0)
-
-
 def load_hiv_mortality_profile(
     profile_path=HIV_MORTALITY_PROFILE_PATH,
     num_ages=100,
@@ -325,6 +189,8 @@ def load_hiv_mortality_profile(
         )
     if np.any(hiv_mortality_profile < 0):
         raise ValueError("The HIV mortality profile must be nonnegative.")
+    if not np.all(np.isfinite(hiv_mortality_profile)):
+        raise ValueError("The HIV mortality profile must be finite.")
 
     return hiv_mortality_profile
 
@@ -358,18 +224,17 @@ def disease_pop(
     imm_rates,
     un_country_code="710",
     excess_deaths=202_693,
-    hiv_mortality_profile_path=None,
+    hiv_mortality_profile=None,
     phase_in_years=5,
 ):
     """
     Modify mortality and then get new population objects
     Estimated lives saved per year in South Africa: 202,693
     Source: https://www.cgdev.org/blog/how-many-lives-does-us-foreign-aid-save
-    If ``hiv_mortality_profile_path`` is provided, use the checked-in
-    age-specific South Africa HIV mortality profile as the shape for an
-    additive mortality shock and solve for one scalar so year-5 realized
-    excess deaths match the target. Otherwise, fall back to one proportional
-    all-age mortality multiplier.
+    If ``hiv_mortality_profile`` is provided, use the age-specific HIV
+    mortality profile as the shape for an additive mortality shock and solve
+    for one scalar so year-5 realized excess deaths match the target.
+    Otherwise, fall back to one proportional all-age mortality multiplier.
 
     Args:
         p (Specifications): baseline parameters
@@ -378,8 +243,8 @@ def disease_pop(
         infmort_rates (np.array): infant mortality rates
         imm_rates (np.array): immigration rates
         excess_deaths (int): number of excess deaths to achieve
-        hiv_mortality_profile_path (str): optional path to a checked-in
-            age-specific HIV mortality profile used to construct the shock
+        hiv_mortality_profile (np.array or None): optional 1-D age-specific
+            HIV mortality profile used to shape the additive mortality shock
         phase_in_years (int): number of years to phase in mortality changes
 
     Returns:
@@ -396,7 +261,17 @@ def disease_pop(
 
     # Phase in the mortality changes over the requested number of years.
     alt_mort_rates = mort_rates.copy()
-    if hiv_mortality_profile_path is not None:
+    if hiv_mortality_profile is not None:
+        if (
+            hiv_mortality_profile.ndim != 1
+            or hiv_mortality_profile.shape[0] != mort_rates.shape[1]
+            or np.any(hiv_mortality_profile < 0)
+            or not np.all(np.isfinite(hiv_mortality_profile))
+        ):
+            raise ValueError(
+                "hiv_mortality_profile must be a finite, nonnegative, "
+                f"1-D array of length {mort_rates.shape[1]}."
+            )
         baseline_final_year_total_deaths = total_deaths(
             pop_dist,
             fert_rates,
@@ -405,10 +280,6 @@ def disease_pop(
             imm_rates,
             num_years=num_years,
         )[num_years - 1, :].sum()
-        hiv_mortality_profile = load_hiv_mortality_profile(
-            hiv_mortality_profile_path,
-            num_ages=mort_rates.shape[1],
-        )
 
         def build_hiv_shock_path(shock_scale):
             shocked_mortality = mort_rates.copy()

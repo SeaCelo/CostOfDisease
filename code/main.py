@@ -77,10 +77,11 @@ def main():
     ) = get_pop_data.baseline_pop(p)
     p.update_specifications(pop_dict)
 
-    # Freeze the paper's GBD-based mortality mapping as a checked-in
-    # age-specific HIV mortality profile so reruns do not rebuild it from the
-    # raw source CSV.
-    hiv_mortality_profile_path = get_pop_data.HIV_MORTALITY_PROFILE_PATH
+    # Load the checked-in GBD-based HIV mortality profile for the reform
+    # scenarios.
+    hiv_mortality_profile = get_pop_data.load_hiv_mortality_profile(
+        get_pop_data.HIV_MORTALITY_PROFILE_PATH
+    )
 
     # Run model
     start_time = time.time()
@@ -110,7 +111,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=132_600,
-        hiv_mortality_profile_path=hiv_mortality_profile_path,
+        hiv_mortality_profile=hiv_mortality_profile,
     )
     p2.update_specifications(new_pop_dict)
 
@@ -152,7 +153,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=81_958,
-        hiv_mortality_profile_path=hiv_mortality_profile_path,
+        hiv_mortality_profile=hiv_mortality_profile,
     )
     p3.update_specifications(new_pop_dict)
 
@@ -189,7 +190,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=192_212,
-        hiv_mortality_profile_path=hiv_mortality_profile_path,
+        hiv_mortality_profile=hiv_mortality_profile,
     )
     p4.update_specifications(new_pop_dict)
 
