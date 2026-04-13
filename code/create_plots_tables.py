@@ -245,7 +245,7 @@ def plots(
         )  # convert to billions of dollars
     results_df = pd.DataFrame.from_dict(results_first_N_years, orient="index")
     # rename column
-    results_df.columns = [r"$\Delta$ GDP, Billions $"]
+    results_df.columns = [r"$\Delta$ GDP, Billions"]
     results_df.to_latex(
         buf=os.path.join(plot_path, f"mean_gdp_change_{N_YEARS}years.tex"),
         float_format="%.2f",
@@ -269,7 +269,7 @@ def plots(
             )
     # Save table to disk
     formatted_table = pd.DataFrame(results_NPV)
-    formatted_table.reset_index().to_latex(
+    formatted_table.to_latex(
         buf=os.path.join(plot_path, "npv_gdp_table.tex"),
         index=False,
         index_names=False,

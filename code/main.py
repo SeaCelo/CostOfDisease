@@ -8,7 +8,6 @@ import os
 import json
 import time
 import copy
-import numpy as np
 import pandas as pd
 from importlib.resources import files
 import matplotlib.pyplot as plt
@@ -60,6 +59,10 @@ def main():
     ) as file:
         defaults = json.load(file)
     p.update_specifications(defaults)
+    p.initial_guess_r_SS = 0.03864
+    # Current OG-Core/OG-ZAF completes the reform runs only with a
+    # slightly looser post-solve resource-constraint acceptance threshold.
+    p.RC_TPI = 0.0075
 
     # get baseline population data (rather than use what is in JSON)
     (
@@ -73,6 +76,12 @@ def main():
         baseline_deaths,
     ) = get_pop_data.baseline_pop(p)
     p.update_specifications(pop_dict)
+
+    # Load the checked-in GBD-based HIV mortality profile for the reform
+    # scenarios.
+    hiv_mortality_profile = get_pop_data.load_hiv_mortality_profile(
+        get_pop_data.HIV_MORTALITY_PROFILE_PATH
+    )
 
     # Run model
     start_time = time.time()
@@ -102,6 +111,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=132_600,
+        hiv_mortality_profile=hiv_mortality_profile,
     )
     p2.update_specifications(new_pop_dict)
 
@@ -142,7 +152,8 @@ def main():
         infmort_rates,
         imm_rates,
         UN_COUNTRY_CODE,
-        excess_deaths=98_350,
+        excess_deaths=81_958,
+        hiv_mortality_profile=hiv_mortality_profile,
     )
     p3.update_specifications(new_pop_dict)
 
@@ -179,6 +190,7 @@ def main():
         imm_rates,
         UN_COUNTRY_CODE,
         excess_deaths=192_212,
+        hiv_mortality_profile=hiv_mortality_profile,
     )
     p4.update_specifications(new_pop_dict)
 
