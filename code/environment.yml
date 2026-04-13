@@ -26,6 +26,5 @@ dependencies:
 - pip:
   - openpyxl>=3.1.2
   - linecheck
-  - pandas-datareader
-  - ogcore @ git+https://github.com/PSLmodels/OG-Core.git@bfe4c5bef220dee8538508b5175c2759e497e903
-  - ogzaf @ git+https://github.com/EAPD-DRB/OG-ZAF.git@819fad9349d9c4643675fb0450e0cc653a7d331a
+  - ogcore==0.15.5
+  - ogzaf==0.0.11

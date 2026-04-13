@@ -1,3 +1,4 @@
+name: disease-dev
 channels:
   - conda-forge
   - defaults
@@ -49,11 +50,11 @@ dependencies:
   - certifi=2026.2.25=pyhd8ed1ab_0
   - cffi=2.0.0=py313h224173a_1
   - charset-normalizer=3.4.7=pyhd8ed1ab_0
-  - click=8.3.1=pyh8f84b5b_1
+  - click=8.3.2=pyhc90fa1f_0
   - cloudpickle=3.1.2=pyhcf101f3_1
   - comm=0.2.3=pyhe01879c_0
   - contourpy=1.3.3=py313h2af2deb_4
-  - cpython=3.13.12=py313hd8ed1ab_100
+  - cpython=3.13.13=py313hd8ed1ab_100
   - cycler=0.12.1=pyhcf101f3_2
   - cytoolz=1.1.0=py313h0997733_2
   - dask=2026.3.0=pyhc364b38_0
@@ -80,7 +81,7 @@ dependencies:
   - icu=78.3=hef89b57_0
   - idna=3.11=pyhd8ed1ab_0
   - importlib-metadata=8.8.0=pyhcf101f3_0
-  - importlib_resources=6.5.2=pyhd8ed1ab_0
+  - importlib_resources=7.0.0=pyhd8ed1ab_0
   - interface_meta=1.3.0=pyhd8ed1ab_1
   - ipykernel=7.2.0=pyh5552912_1
   - ipython=9.12.0=pyhecfbec7_0
@@ -124,7 +125,7 @@ dependencies:
   - libcblas=3.11.0=6_hb0561ab_openblas
   - libcrc32c=1.1.2=hbdafb3b_0
   - libcurl=8.19.0=hd5a2499_0
-  - libcxx=22.1.2=h55c6f16_0
+  - libcxx=22.1.3=h55c6f16_0
   - libdeflate=1.25=hc11a715_0
   - libedit=3.1.20250104=pl5321hafb1f1b_0
   - libev=4.33=h93a5062_2
@@ -140,20 +141,20 @@ dependencies:
   - libgoogle-cloud-storage=3.3.0=ha114238_1
   - libgrpc=1.78.1=h3e3f78d_0
   - libiconv=1.18=h23cfdf5_2
-  - libjpeg-turbo=3.1.2=hc919400_0
+  - libjpeg-turbo=3.1.4.1=h84a0fba_0
   - liblapack=3.11.0=6_hd9741b5_openblas
-  - liblzma=5.8.2=h8088a28_0
+  - liblzma=5.8.3=h8088a28_0
   - libmpdec=4.0.0=h84a0fba_1
   - libnghttp2=1.68.1=h8f3e76b_0
   - libopenblas=0.3.32=openmp_he657e61_0
   - libopentelemetry-cpp=1.26.0=h08d5cc3_0
   - libopentelemetry-cpp-headers=1.26.0=hce30654_0
   - libparquet=23.0.1=h16c0493_9_cpu
-  - libpng=1.6.56=h132b30e_0
+  - libpng=1.6.57=h132b30e_0
   - libprotobuf=6.33.5=h4a5acfd_0
   - libre2-11=2025.11.05=h4c27e2a_1
   - libsodium=1.0.21=h1a92334_3
-  - libsqlite=3.52.0=h1ae2325_0
+  - libsqlite=3.53.0=h1b79a29_0
   - libssh2=1.11.1=h1590b86_0
   - libthrift=0.22.0=h14a376c_1
   - libtiff=4.7.1=h4030677_1
@@ -164,7 +165,7 @@ dependencies:
   - libxml2-16=2.15.2=h5ef1a60_0
   - libzlib=1.3.2=h8088a28_2
   - linearmodels=7.0=py313hc577518_0
-  - llvm-openmp=22.1.2=hc7d1edf_0
+  - llvm-openmp=22.1.3=hc7d1edf_0
   - llvmlite=0.47.0=py313h691f2cf_0
   - locket=1.0.0=pyhd8ed1ab_0
   - lz4=4.4.5=py313hd065f0a_1
@@ -178,9 +179,9 @@ dependencies:
   - msgpack-python=1.1.2=py313ha61f8ec_1
   - munkres=1.1.4=pyhd8ed1ab_1
   - mypy_extensions=1.1.0=pyha770c72_0
-  - narwhals=2.18.1=pyhcf101f3_1
+  - narwhals=2.19.0=pyhcf101f3_0
   - nbclient=0.10.4=pyhd8ed1ab_0
-  - nbconvert-core=7.17.0=pyhcf101f3_0
+  - nbconvert-core=7.17.1=pyhcf101f3_0
   - nbformat=5.10.4=pyhd8ed1ab_1
   - ncurses=6.5=h5e97a16_3
   - nest-asyncio=1.6.0=pyhd8ed1ab_1
@@ -190,7 +191,7 @@ dependencies:
   - numba=0.65.0=py313h3ca053b_0
   - numpy=2.4.3=py313he4a34aa_0
   - openjpeg=2.5.4=hd9e9057_0
-  - openssl=3.6.1=hd24854e_1
+  - openssl=3.6.2=hd24854e_0
   - orc=2.3.0=hd11884d_0
   - overrides=7.7.0=pyhd8ed1ab_1
   - packaging=26.0=pyhcf101f3_0
@@ -204,9 +205,9 @@ dependencies:
   - pexpect=4.9.0=pyhd8ed1ab_1
   - pillow=12.2.0=py313h45e5a15_0
   - pip=26.0.1=pyh145f28c_0
-  - platformdirs=4.9.4=pyhcf101f3_0
+  - platformdirs=4.9.6=pyhcf101f3_0
   - prometheus-cpp=1.3.0=h0967b3e_0
-  - prometheus_client=0.24.1=pyhd8ed1ab_0
+  - prometheus_client=0.25.0=pyhd8ed1ab_0
   - prompt-toolkit=3.0.52=pyha770c72_0
   - prompt_toolkit=3.0.52=hd8ed1ab_0
   - psutil=7.2.2=py313h6688731_0
@@ -222,10 +223,10 @@ dependencies:
   - pyobjc-framework-cocoa=12.1=py313hcc5defa_0
   - pyparsing=3.3.2=pyhcf101f3_0
   - pysocks=1.7.1=pyha55dd90_7
-  - python=3.13.12=h20e6be0_100_cp313
+  - python=3.13.13=h20e6be0_100_cp313
   - python-dateutil=2.9.0.post0=pyhe01879c_2
   - python-fastjsonschema=2.21.2=pyhe01879c_0
-  - python-gil=3.13.12=h4df99d1_100
+  - python-gil=3.13.13=h4df99d1_100
   - python-json-logger=2.0.7=pyhd8ed1ab_0
   - python-tzdata=2026.1=pyhd8ed1ab_0
   - python_abi=3.13=8_cp313
@@ -286,13 +287,12 @@ dependencies:
       - argparse==1.4.0
       - et-xmlfile==2.0.0
       - linecheck==0.1.0
-      - lxml==6.0.2
       - ogcore==0.15.5
       - ogzaf==0.0.11
       - openpyxl==3.1.5
-      - pandas-datareader==0.10.0
       - pathlib==1.0.1
       - progressbar2==4.5.0
       - pygam==0.12.0
       - python-utils==3.9.1
       - scipy==1.16.3
+prefix: /opt/anaconda3/envs/disease-dev
