@@ -49,4 +49,4 @@ The following are the steps to fully replicating all of our analyses in the pape
 * [`LICENSE`](LICENSE): Creative Commons open source license for this repository.
 * [`README.md`](README.md): README file with instructions on the content of and how to use this repository.
 * [`./paper/`](paper/): Directory in which all of the draft LaTeX files and image files are stored.
-    * [`./paper/CostOfDisease.pdf`](paper/CostOfDisease.pdf): PDF file of most recent version of the paper.
+    * [`./paper/CostOfDisease_JDE.pdf`](paper/CostOfDisease_JDE.pdf): PDF file of most recent version of the paper.
