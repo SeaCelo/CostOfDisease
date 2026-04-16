@@ -2,6 +2,7 @@
 # more excess deaths do to the lack of foreign aid.
 
 # imports
+import argparse
 import multiprocessing
 from distributed import Client
 import os
@@ -22,10 +23,13 @@ import create_plots_tables
 UN_COUNTRY_CODE = "710"
 
 
-def main():
+def main(plot_only=False):
     # Define parameters to use for multiprocessing
     num_workers = min(multiprocessing.cpu_count(), 7)
-    client = Client(n_workers=num_workers, threads_per_worker=1)
+    if not plot_only:
+        client = Client(n_workers=num_workers, threads_per_worker=1)
+    else:
+        client = None
     print("Number of workers = ", num_workers)
 
     # Directories to save data
@@ -87,7 +91,8 @@ def main():
 
     # Run model
     start_time = time.time()
-    runner(p, time_path=True, client=client)
+    if not plot_only:
+        runner(p, time_path=True, client=client)
     print("run time = ", time.time() - start_time)
 
     """
@@ -130,7 +135,8 @@ def main():
 
     # Run model
     start_time = time.time()
-    runner(p2, time_path=True, client=client)
+    if not plot_only:
+        runner(p2, time_path=True, client=client)
     print("run time = ", time.time() - start_time)
 
     """
@@ -167,7 +173,8 @@ def main():
 
     # Run model
     start_time = time.time()
-    runner(p3, time_path=True, client=client)
+    if not plot_only:
+        runner(p3, time_path=True, client=client)
     print("run time = ", time.time() - start_time)
 
     """
@@ -204,7 +211,8 @@ def main():
 
     # Run model
     start_time = time.time()
-    runner(p4, time_path=True, client=client)
+    if not plot_only:
+        runner(p4, time_path=True, client=client)
     print("run time = ", time.time() - start_time)
 
     """
@@ -266,7 +274,8 @@ def main():
 
     # Run model
     start_time = time.time()
-    runner(p6, time_path=True, client=client)
+    if not plot_only:
+        runner(p6, time_path=True, client=client)
     print("run time = ", time.time() - start_time)
 
     """
@@ -364,4 +373,11 @@ def main():
 
 if __name__ == "__main__":
     # execute only if run as a script
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--plot_only",
+        action="store_true",
+        help="Skip model runs and only generate plots and tables from existing output.",
+    )
+    args = parser.parse_args()
+    main(plot_only=args.plot_only)
