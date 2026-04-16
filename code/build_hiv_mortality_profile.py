@@ -101,8 +101,7 @@ def build_gbd_hiv_mortality_profile(
     if not covered_ages.all():
         missing_ages = np.where(~covered_ages)[0]
         raise ValueError(
-            "GBD HIV age groups do not cover model ages "
-            f"{missing_ages}."
+            "GBD HIV age groups do not cover model ages " f"{missing_ages}."
         )
 
     gbd_group_rates = {}
@@ -125,8 +124,7 @@ def build_gbd_hiv_mortality_profile(
     missing_labels = sorted(set(required_age_labels) - gbd_group_rates.keys())
     if missing_labels:
         raise ValueError(
-            "Missing GBD HIV rate rows for age groups "
-            f"{missing_labels}."
+            "Missing GBD HIV rate rows for age groups " f"{missing_labels}."
         )
 
     anchor_rates = np.array(
