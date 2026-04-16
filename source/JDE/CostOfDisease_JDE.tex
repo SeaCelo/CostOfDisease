@@ -275,7 +275,7 @@ In the illustrative South Africa calibration, we draw on three independent morta
 Figure \ref{fig:cumDeaths} shows the cumulative excess deaths implied by these three annualized mortality targets. These excess deaths trajectories are calculated by mapping the low, medium, and high estimates described above into the mortality rates in the demographic module of our macroeconomic model and simulating the population as described in the next section.
 
 \begin{figure}[H]
-    \caption{Forecasted cumulative excess deaths in South Africa from US aid cuts}
+    \caption{Forecasted cumulative excess deaths in South Africa under alternative health aid withdrawal scenarios}
     \label{fig:cumDeaths}
     \centering
     \includegraphics[scale=0.75]{./tables_figures/cumulative_excess_deaths.png}
@@ -303,7 +303,7 @@ This implies 20\%, 40\%, 60\%, 80\%, and 100\% of the full adjustment in years 1
 The resulting age-specific mortality schedules are then passed directly to the model as scenario-specific demographic inputs. This GBD-based procedure can be applied to alternative demographic baselines or disease contexts by substituting country-specific excess-death targets, a country-specific HIV mortality profile, and baseline mortality schedules. Figure \ref{fig:Mortality} shows the resulting mortality profiles for 2040, after the phase-in is complete.
 
 \begin{figure}[H]
-    \caption{South African mortality rates by age with and without aid in 2040}
+    \caption{South African mortality rates in 2040 under alternative scenarios}
     \label{fig:Mortality}
     \centering
     \includegraphics[scale=0.75]{./tables_figures/mortality_rates.png}
@@ -393,7 +393,10 @@ We treat the low, medium, and high cases as alternative externally generated epi
 The design enables mechanism attribution in the aggregate outcomes: mortality shocks reduce the stock of future workers, and morbidity shocks reduce effective labor supplied by surviving workers.
 
 
-\section{Results}\label{SecResults}
+\section{South Africa Simulation Results}\label{SecResults}
+
+
+\subsection{Impacts of Disease Burden on GDP}
 
 We simulate each of the three scenarios described above with the corresponding mortality and morbidity adjustments for our South Africa calibrated macroeconomic model. The results show that the macroeconomic costs of renewed disease burden in South Africa are substantial and persistent after aid withdrawal.
 
@@ -445,6 +448,26 @@ Table \ref{tab:NPVLosses} summarizes the net present value (NPV) of cumulative G
 These results indicate that the economic burden of disease extends far beyond the direct costs to the health sector. Even in the more optimistic scenario, where the health system absorbs much of the shock, the loss in output is substantial. The high-impact scenario shows that a collapse in treatment access and mitigation capacity could leave GDP on average 3.3\% below the baseline path over the first two decades, with average annual losses of about \$25.0 billion.
 
 The spread in outcomes across low, medium, and high scenarios should be interpreted as sensitivity to epidemiological input uncertainty rather than full parametric uncertainty of all model assumptions. Even under this conservative framing, the implied long-run macroeconomic losses remain large and persistent. These South Africa results are best understood as one realization of the framework under a particular demographic structure, disease profile, and external financing composition.
+
+
+\subsection{Decomposing the GDP Losses}
+
+\begin{table}[H] \centering \captionsetup{width=6.0in}
+\caption{\label{tab:NPVdecomposition}Net Present Value of GDP Loss Under Medium Scenario (billions of 2025 USD), South Africa}
+\begin{tabular}{lrrr}
+\hline
+Discount & Only Mortality & Only Productivity  & All Effects,\\
+ rate &  Effects &  Effects & Gandhi, et al. (2025) \\
+\hline \hline
+1\% & -8,67.21 & -129.49 & -8,991.62 \\
+2\% & -4,647.99 & -72.60 & -4,719.45 \\
+3\% & -2,596.99 & -44.14 & -2,641.73 \\
+4\% & -1,548.00 & -29.07 & -1,578.45 \\
+6\% & -657.35 & -15.48 & -674.68 \\
+\hline\hline
+\end{tabular}
+\end{table}
+
 
 \section{Discussion and Policy Implications}\label{SecDiscussion}
 
