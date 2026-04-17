@@ -17,10 +17,7 @@ from scipy.interpolate import PchipInterpolator
 
 import get_pop_data
 
-try:
-    plt.style.use("ogcore.OGcorePlots")
-except OSError:
-    pass
+plt.style.use("ogcore.OGcorePlots")
 
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 GBD_HIV_RATE_DATA_PATH = os.path.abspath(
@@ -236,7 +233,7 @@ def plot_gbd_hiv_mortality_profile(
         output_path (str): path to save the figure
     """
     ages = np.arange(hiv_mortality_profile.shape[0])
-    fig, ax = plt.subplots()
+    fig = plt.figure()
     plt.plot(
         ages,
         hiv_mortality_profile * 100_000.0,
@@ -252,7 +249,7 @@ def plot_gbd_hiv_mortality_profile(
     plt.xlabel("Age")
     plt.ylabel("Death rate per 100,000")
     plt.ylim(top=hiv_mortality_profile.max() * 100_000.0 * 1.10)
-    handles, labels = ax.get_legend_handles_labels()
+    handles, labels = plt.gca().get_legend_handles_labels()
     plt.legend(
         handles[::-1],
         labels[::-1],
