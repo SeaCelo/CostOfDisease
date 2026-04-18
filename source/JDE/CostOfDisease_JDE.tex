@@ -287,7 +287,7 @@ The mortality scenarios above are specified as annual excess-death totals. Imple
 
 In the South Africa application, baseline mortality rates by age come from the United Nations World Population Prospects 2024 \citep{UN2024} and define the no-shock counterfactual path. For South Africa, we construct $h(s)$ from the 2023 South Africa, both-sexes, HIV/AIDS death-rate profile from the GBD Results Tool \citep{GBD2023Results}, using only the finest non-overlapping age groups reported in the source file. Those grouped death rates are then transformed into a smooth exact-age mortality profile aligned to the model ages.\footnote{Each reported GBD age bin is assigned to a representative age, and the grouped death rates are interpolated on the log-rate scale using shape-preserving piecewise cubic interpolation to obtain a smooth exact-age mortality profile over ages 0 to 99.}
 
-Figure \ref{fig:GBDprofile} shows the original grouped GBD age-group death rates together with the fitted exact-age mortality profile $h(s)$ used in the model. This fitted profile then provides the age pattern used to translate each scenario's annual excess-death target into an age-specific mortality schedule.
+Figure \ref{fig:GBDprofile} shows the original grouped GBD age-group death rates together with the fitted exact-age mortality profile $h(s)$ used in the model.
 
 \begin{figure}[H]
     \caption{South African HIV/AIDS age-group death rates and fitted exact-age mortality profile in 2023}
@@ -296,7 +296,7 @@ Figure \ref{fig:GBDprofile} shows the original grouped GBD age-group death rates
     \includegraphics[scale=0.75]{./tables_figures/gbd_hiv_profile_points_fit.png}
 \end{figure}
 
-For mortality scenario $m$, let $E_m$ denote the annual excess-death target. Mortality then follows
+Using this fitted profile to allocate excess deaths across ages, mortality in scenario $m$ follows
 \begin{equation}
 \rho_{s,t}^{(m)}=
 \min\left\{\rho^{0}_{s,t}+ \kappa_m g_t h(s),1\right\},
