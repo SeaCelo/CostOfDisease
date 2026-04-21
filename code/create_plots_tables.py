@@ -346,7 +346,7 @@ def plots(
     years = np.arange(base_params.start_year, base_params.start_year + idx)
     K_base = unstationarize_vars("K", base_tpi, base_params)
     L_base = unstationarize_vars("L", base_tpi, base_params)
-    k = "Brink, et al. (2025)"
+    k = "Gandhi, et al. (2025)"
     K_ref = unstationarize_vars(
         "K",
         reform_dict[k]["tpi_vars"],

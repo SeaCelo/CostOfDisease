@@ -246,7 +246,8 @@ def main(plot_only=False):
 
     # Run model
     start_time = time.time()
-    # runner(p5, time_path=True, client=client)
+    if not plot_only:
+        runner(p5, time_path=True, client=client)
     print("run time = ", time.time() - start_time)
 
     """
