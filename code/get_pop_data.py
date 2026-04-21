@@ -341,8 +341,7 @@ def disease_pop(
 
         for i in range(num_years):
             alt_mort_rates[i, :] = np.minimum(
-                mort_rates[i, :]
-                * (1 + scale_factor * (i + 1) / num_years),
+                mort_rates[i, :] * (1 + scale_factor * (i + 1) / num_years),
                 1.0,
             )
 

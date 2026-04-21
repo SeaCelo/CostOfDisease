@@ -1,5 +1,4 @@
 # directories
-CostOutput/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -192,7 +191,6 @@ cython_debug/
 .DS_Store
 
 # Local manuscript build outputs and reference data caches
-source/JDE/*.pdf
 source/JDE/hiv-data/*
 !source/JDE/hiv-data/IHME-GBD_2023_DATA-ddf37f70-1/
 source/JDE/hiv-data/IHME-GBD_2023_DATA-ddf37f70-1/*
