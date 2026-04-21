@@ -199,7 +199,10 @@ def plots(
         )
     plt.xlabel("Year")
     plt.ylabel("Cumulative Excess Deaths (millions)")
-    plt.legend(loc="upper left")
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.legend(
+        handles[::-1], labels[::-1], loc="lower right", bbox_to_anchor=(1.0, 0.08)
+    )
     fig.savefig(
         os.path.join(plot_path, "cumulative_excess_deaths.png"), dpi=300
     )

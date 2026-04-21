@@ -283,11 +283,20 @@ Figure \ref{fig:cumDeaths} shows the cumulative excess deaths implied by these t
 
 \subsection{Mapping Excess Deaths to Age-Specific Mortality Schedules}
 
-This subsection translates scenario-level annual excess-death targets into age-specific mortality schedules used in the model's demographic inputs. Baseline mortality rates by age come from the United Nations World Population Prospects 2024 \citep{UN2024} and define the no-shock counterfactual path.
+The mortality scenarios above are specified as annual excess-death totals. Implementing those shocks in the model requires translating each aggregate mortality shock into an age-specific mortality schedule for the demographic block. More generally, this requires an age profile of excess mortality, denoted $h(s)$, that determines how a given aggregate mortality shock is distributed across ages. This step matters because the same total number of excess deaths can imply different demographic and macroeconomic effects depending on which ages are affected. Assigning the shock uniformly across ages, or scaling baseline mortality proportionally at all ages, would therefore be inappropriate when mortality risk is concentrated in particular age groups. Instead, we use epidemiological evidence on the age pattern of mortality to construct $h(s)$ and map aggregate excess deaths into model-consistent age-specific mortality schedules.
 
-In the model, excess mortality projections enter as changes in age-specific mortality rates (equivalently, survival probabilities), which determine cohort size and age structure over time. Rather than scaling mortality proportionally at all ages, the implementation uses the South Africa HIV/AIDS mortality profile from the GBD Results Tool \citep{GBD2023Results} to determine how the annual excess-death totals are distributed across ages. We use the 2023 South Africa, both-sexes, HIV/AIDS death-rate profile from the GBD data and restrict attention to the non-overlapping age groups reported in the source file. Those grouped death rates are then transformed into a smooth exact-age mortality profile aligned to the model ages.
+In the South Africa application, baseline mortality rates by age come from the United Nations World Population Prospects 2024 \citep{UN2024} and define the no-shock counterfactual path. For South Africa, we construct $h(s)$ from the 2023 South Africa, both-sexes, HIV/AIDS death-rate profile from the GBD Results Tool \citep{GBD2023Results}, using only the finest non-overlapping age groups reported in the source file. Those grouped death rates are then transformed into a smooth exact-age mortality profile aligned to the model ages.\footnote{Each reported GBD age bin is assigned to a representative age, and the grouped death rates are interpolated on the log-rate scale using shape-preserving piecewise cubic interpolation to obtain a smooth exact-age mortality profile over ages 0 to 99.}
 
-For each mortality scenario $m$, let $h(s)$ denote this smooth HIV mortality profile by age and let $E_m$ denote the annual excess-death target. Mortality then follows
+Figure \ref{fig:GBDprofile} shows the original grouped GBD age-group death rates together with the fitted exact-age mortality profile $h(s)$ used in the model.
+
+\begin{figure}[H]
+    \caption{South African HIV/AIDS age-group death rates and fitted exact-age mortality profile in 2023}
+    \label{fig:GBDprofile}
+    \centering
+    \includegraphics[scale=0.75]{./tables_figures/gbd_hiv_profile_points_fit.png}
+\end{figure}
+
+Using this fitted profile to allocate excess deaths across ages, mortality in scenario $m$ follows
 \begin{equation}
 \rho_{s,t}^{(m)}=
 \min\left\{\rho^{0}_{s,t}+ \kappa_m g_t h(s),1\right\},
@@ -298,9 +307,9 @@ t/5, & t=1,\ldots,5,\\
 1, & t>5.
 \end{cases}
 \end{equation}
-This implies 20\%, 40\%, 60\%, 80\%, and 100\% of the full adjustment in years 1 through 5, and full intensity thereafter. The scalar $\kappa_m$ is calibrated separately for each scenario so that realized excess deaths in the fifth year of the phase-in match the annual excess-death target $E_m$ after accounting for endogenous demographic transitions over the phase-in window. This procedure preserves the detailed South Africa HIV age profile while avoiding artificial jumps in mortality at arbitrary bin boundaries. Infant mortality is held at its baseline path rather than being scaled with the mortality shock, and all mortality rates are capped at 1 by construction.
+This implies 20\%, 40\%, 60\%, 80\%, and 100\% of the full adjustment in years 1 through 5, and full intensity thereafter. The scalar $\kappa_m$ is calibrated separately for each scenario so that model-implied excess deaths in the fifth year of the phase-in match the annual excess-death target $E_m$, after accounting for endogenous demographic transitions over the phase-in window. This preserves the HIV age profile while smoothing across the original age-bin boundaries. Infant mortality is held at its baseline path rather than being scaled with the mortality shock, and all mortality rates are capped at 1 by construction.
 
-The resulting age-specific mortality schedules are then passed directly to the model as scenario-specific demographic inputs. This GBD-based procedure can be applied to alternative demographic baselines or disease contexts by substituting country-specific excess-death targets, a country-specific HIV mortality profile, and baseline mortality schedules. Figure \ref{fig:Mortality} shows the resulting cumulative survival rates for 2040, after the phase-in is complete.  And important feature of the mortality shock is that it not only reduces the size of the population, but also changes the age structure of the population. In particular, the HIV-driven mortality shock reduces the share of working-age adults relative to children and elderly, which has implications for labor supply and dependency ratios in the economy.
+The resulting age-specific mortality schedules are then passed directly to the model as scenario-specific demographic inputs. This GBD-based procedure can be applied to alternative demographic baselines or disease contexts by substituting country-specific excess-death targets, a country-specific HIV mortality profile, and baseline mortality schedules. Figure \ref{fig:Mortality} shows the resulting cumulative survival rates for 2040, after the phase-in is complete. An important feature of the mortality shock is that it not only reduces the size of the population, but also changes the age structure of the population. In particular, the HIV-driven mortality shock reduces the share of working-age adults relative to children and elderly, which has implications for labor supply and dependency ratios in the economy.
 
 \begin{figure}[H]
     \caption{South African cumulative survival rates in 2040 under alternative scenarios}
