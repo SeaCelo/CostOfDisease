@@ -11,10 +11,13 @@ source file changes or the interpolation method is revised.
 import csv
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
 import get_pop_data
+
+plt.style.use("ogcore.OGcorePlots")
 
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 GBD_HIV_RATE_DATA_PATH = os.path.abspath(
@@ -26,6 +29,16 @@ GBD_HIV_RATE_DATA_PATH = os.path.abspath(
         "hiv-data",
         "IHME-GBD_2023_DATA-ddf37f70-1",
         "IHME-GBD_2023_DATA-ddf37f70-1.csv",
+    )
+)
+GBD_HIV_PROFILE_FIGURE_PATH = os.path.abspath(
+    os.path.join(
+        CUR_DIR,
+        "..",
+        "source",
+        "JDE",
+        "tables_figures",
+        "gbd_hiv_profile_points_fit.png",
     )
 )
 GBD_HIV_RATE_GROUPS = [
@@ -54,7 +67,7 @@ GBD_HIV_RATE_GROUPS = [
 ]
 
 
-def build_gbd_hiv_mortality_profile(
+def load_gbd_hiv_anchor_points(
     csv_path=GBD_HIV_RATE_DATA_PATH,
     location_name="South Africa",
     sex_name="Both",
@@ -63,11 +76,10 @@ def build_gbd_hiv_mortality_profile(
     min_rate=1e-12,
 ):
     """
-    Build a smooth exact-age HIV/AIDS mortality profile from GBD.
+    Load the grouped GBD HIV/AIDS mortality rates used as anchor points.
 
     The GBD results CSV includes overlapping summary ages. This loader uses
-    only the finest non-overlapping groups defined in ``GBD_HIV_RATE_GROUPS``
-    and returns an exact-age mortality profile aligned to the model ages.
+    only the finest non-overlapping groups defined in ``GBD_HIV_RATE_GROUPS``.
 
     Args:
         csv_path (str): path to the GBD results CSV
@@ -78,7 +90,8 @@ def build_gbd_hiv_mortality_profile(
         min_rate (float): lower bound used on the log-rate scale
 
     Returns:
-        np.array: smooth exact-age HIV mortality profile
+        tuple[list[str], np.array, np.array]: age labels, anchor ages, and
+            grouped death rates in mortality-rate units
 
     """
     covered_ages = np.zeros(num_ages, dtype=bool)
@@ -134,8 +147,61 @@ def build_gbd_hiv_mortality_profile(
         ],
         dtype=float,
     )
+
+    return required_age_labels, np.array(anchor_ages, dtype=float), anchor_rates
+
+
+def build_gbd_hiv_mortality_profile(
+    csv_path=GBD_HIV_RATE_DATA_PATH,
+    location_name="South Africa",
+    sex_name="Both",
+    year=2023,
+    num_ages=100,
+    min_rate=1e-12,
+):
+    """
+    Build a smooth exact-age HIV/AIDS mortality profile from GBD.
+
+    Args:
+        csv_path (str): path to the GBD results CSV
+        location_name (str): location name in the CSV
+        sex_name (str): sex name in the CSV
+        year (int): year in the CSV
+        num_ages (int): number of model ages
+        min_rate (float): lower bound used on the log-rate scale
+
+    Returns:
+        np.array: smooth exact-age HIV mortality profile
+
+    """
+    _, anchor_ages, anchor_rates = load_gbd_hiv_anchor_points(
+        csv_path=csv_path,
+        location_name=location_name,
+        sex_name=sex_name,
+        year=year,
+        num_ages=num_ages,
+        min_rate=min_rate,
+    )
+    return fit_gbd_hiv_mortality_profile(
+        anchor_ages, anchor_rates, num_ages=num_ages
+    )
+
+
+def fit_gbd_hiv_mortality_profile(anchor_ages, anchor_rates, num_ages=100):
+    """
+    Fit a smooth exact-age HIV/AIDS mortality profile from grouped anchors.
+
+    Args:
+        anchor_ages (np.array): representative ages for grouped GBD rates
+        anchor_rates (np.array): grouped GBD rates in mortality-rate units
+        num_ages (int): number of model ages
+
+    Returns:
+        np.array: smooth exact-age HIV mortality profile
+
+    """
     log_rate_interpolator = PchipInterpolator(
-        np.array(anchor_ages, dtype=float),
+        anchor_ages,
         np.log(anchor_rates),
         extrapolate=False,
     )
@@ -151,8 +217,55 @@ def build_gbd_hiv_mortality_profile(
     return np.maximum(exact_age_hiv_rates, 0.0)
 
 
-def main():
-    hiv_mortality_profile = build_gbd_hiv_mortality_profile()
+def plot_gbd_hiv_mortality_profile(
+    anchor_ages,
+    anchor_rates,
+    hiv_mortality_profile,
+    output_path=GBD_HIV_PROFILE_FIGURE_PATH,
+):
+    """
+    Plot the grouped GBD HIV mortality points and the fitted exact-age curve.
+
+    Args:
+        anchor_ages (np.array): representative ages for grouped GBD rates
+        anchor_rates (np.array): grouped GBD rates in mortality-rate units
+        hiv_mortality_profile (np.array): fitted exact-age profile
+        output_path (str): path to save the figure
+    """
+    ages = np.arange(hiv_mortality_profile.shape[0])
+    fig = plt.figure()
+    plt.plot(
+        ages,
+        hiv_mortality_profile * 100_000.0,
+        label="Fitted exact-age\nprofile",
+    )
+    plt.scatter(
+        anchor_ages,
+        anchor_rates * 100_000.0,
+        color="black",
+        zorder=3,
+        label="2023 HIV/AIDS\nage-group death rates",
+    )
+    plt.xlabel("Age")
+    plt.ylabel("Death rate per 100,000")
+    plt.ylim(top=hiv_mortality_profile.max() * 100_000.0 * 1.10)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.legend(
+        handles[::-1],
+        labels[::-1],
+        loc="upper right",
+        bbox_to_anchor=(1.0, 0.92),
+        fontsize="small",
+    )
+    plt.savefig(output_path, dpi=300)
+    plt.close(fig)
+
+
+def main(save_figure=True):
+    _, anchor_ages, anchor_rates = load_gbd_hiv_anchor_points()
+    hiv_mortality_profile = fit_gbd_hiv_mortality_profile(
+        anchor_ages, anchor_rates
+    )
     output_path = get_pop_data.HIV_MORTALITY_PROFILE_PATH
     np.savetxt(
         output_path,
@@ -160,6 +273,17 @@ def main():
         delimiter=",",
     )
     print(f"Saved HIV mortality profile to {output_path}")
+    if save_figure:
+        plot_gbd_hiv_mortality_profile(
+            anchor_ages,
+            anchor_rates,
+            hiv_mortality_profile,
+            output_path=GBD_HIV_PROFILE_FIGURE_PATH,
+        )
+        print(
+            "Saved HIV mortality profile figure to "
+            f"{GBD_HIV_PROFILE_FIGURE_PATH}"
+        )
 
 
 if __name__ == "__main__":
